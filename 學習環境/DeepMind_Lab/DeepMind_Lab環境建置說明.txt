@@ -32,3 +32,9 @@ DeepMind Lab環境建置說明
 (1) 如果有重新啟動終端，則要再次輸入步驟10的(1)、(2)指令
 (2) 指令：bazel run :python_random_agent --define graphics=sdl -- \
                --length=10000 --width=640 --height=480
+
+
+參考連結：
+1. <Deepmind lab 在Python中的环境搭建>。網址：https://ddayzzz.wang/archives/687
+2. <Ubuntu16.04下 DeepMind Lab的配置与安装>。網址：https://blog.csdn.net/z136411501/article/details/102969792
+
