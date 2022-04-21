@@ -1,3 +1,12 @@
+2022/4/21
+題目：影像辨識輔助電腦程式控制
+出席組員：林軒宇、吳宣霈、王璽銘、蔣秉錕
+會議內容：在研究生的協助下，於實驗室內架設Ubuntu遠端作業環境，以利後續的multi-agent reinforcement learning環境之機器人訓練。
+待處理問題：思考實作本專題的目的（故事）。
+會後目標：於遠端作業環境建置Counter-Strike Deathmatch with Large-Scale Behavioural Cloning論文之原始碼以及DeepMind Lab，並透過實際操作學習reinforcement learning的基礎知識。
+
+
+
 2022/3/24
 題目：影像辨識輔助電腦程式控制
 出席組員：林軒宇、吳宣霈、王璽銘、蔣秉錕
