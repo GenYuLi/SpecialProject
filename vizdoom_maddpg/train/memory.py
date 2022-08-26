@@ -1,8 +1,9 @@
 import random
 import torch
+import numpy as np
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+device = "cpu"
 
 # 存储历史状态
 class Memory(object):
@@ -11,12 +12,14 @@ class Memory(object):
         self.size = size
         self.pointer = 0
         self.memory = []
+        self.i = 0
 
     def clear(self):
         self.memory = []
         self.pointer = 0
 
     def add(self, s, a, r, s_, done, s_g=None, a_g=None):
+        self.i = self.i + 1
         data = (s, a, r, s_, done, s_g, a_g)
         if self.pointer >= len(self.memory):
             self.memory.append(data)
@@ -38,11 +41,27 @@ class Memory(object):
             r.append(ri)
             s_.append(s_i)
             dones.append(done)
+
+            '''
+            s_arr = np.array(s)
+            a_arr = np.array(a)
+            r_arr = np.array(r)
+            s__arr = np.array(s_)
+            dones_arr = np.array(dones)
+            '''
+            
         return torch.FloatTensor(s).to(device), torch.FloatTensor(a).to(device), torch.FloatTensor(r).to(
             device), torch.FloatTensor(
             s_).to(device), torch.FloatTensor(dones).to(device)
 
     def sample(self, batch_size):
+        
+        # 測試用
+        '''
+        print('memory:')
+        print(len(self.memory))
+        print(batch_size)
+        '''
         if len(self.memory) < batch_size:
             batch_size = len(self.memory)
         if batch_size > 0:

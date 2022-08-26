@@ -4,6 +4,7 @@ from memory import Memory
 
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
 # Actor被设定为一个三层全连接神经网络，输出为(-1,1)
 class Actor(nn.Module):
@@ -16,10 +17,8 @@ class Actor(nn.Module):
 
     def forward(self, x):
         # 除錯用(檢查輸入資料之形狀) 
-        '''
-        print('x.shape:')
-        print(x.shape)
-        '''
+        #print('x.shape:')
+        #print(x.shape)
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -36,10 +35,8 @@ class Critic(nn.Module):
         self.layer3 = nn.Sequential(nn.Linear(n_hidden_2, 1))
 
     def forward(self, sa):
-        #sa = sa.reshape(sa.size()[0], sa.size()[1] * sa.size()[2])   # 將資料降成一維的原始程式碼
+        sa = sa.reshape(sa.size()[0], sa.size()[1] * sa.size()[2])   # 將資料降成一維的原始程式碼
         #sa = torch.flatten(sa, 0, -1) # 第二種將資料降成一維的程式碼
-        
-        # 目前輸入資料已降維完成，不需要額外處理
         x = self.layer1(sa)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -82,7 +79,6 @@ class DDPGAgent(object):
         self.gamma = gamma
         self.tau = 0.5
         self.local = local
-        self.tmp = 0
 
     # 輸出確切的Agent動作
     def act(self, s):
@@ -91,16 +87,9 @@ class DDPGAgent(object):
     # 以機率形式輸出Agent的動作
     def act_prob(self, s):
         s = torch.flatten(s, 0, -1)
-        # 測試用
-        '''
-        if s.shape[0] != 57600:
-            return self.tmp
-        '''
         a = self.Actor(s)
         noise = torch.normal(mean=0.0, std=torch.Tensor(size=([len(a)])).fill_(0.02)).to(device)
         a_noise = a + noise
-        # 測試用
-        #self.tmp = a_noise
         return a_noise
 
 
@@ -112,43 +101,51 @@ class MADDPG(object):
         # 由於訓練資料大，故將Batch size設定為1
         self.agents = [DDPGAgent(index, 1600, 1, 0.5, state_global, action_global) for index in range(0, n)]
 
+    
     def update_agent(self, sample, index):
         observations, actions, rewards, next_obs, dones = sample
-        # 將新的觀察資料進行降維處理
-        next_obs = torch.flatten(next_obs, 0, -1)
+        
+        # 測試用
+        '''
+        if(index == 0):
+            print('obs:')
+            print(observations)
+            print('actions:')
+            print(actions)
+            print('rewards:')
+            print(rewards)
+            print('next_obs:')
+            print(next_obs)
+        '''
+        
         curr_agent = self.agents[index]
         curr_agent.critic_train.zero_grad()
         all_target_actions = []
         # 根据局部观测值输出动作目标网络的动作
         for i in range(0, self.n):
-            action = curr_agent.Actor_target(next_obs)
+            action = curr_agent.Actor_target(next_obs[:, i])
             all_target_actions.append(action)
-        # 移除action_target_all套用之reshape函式
-        action_target_all = torch.cat(all_target_actions, dim=0).to(device)
-        # target_vf_in之dim參數已經過修改，原始值為2
-        target_vf_in = torch.cat((next_obs, action_target_all), dim=0)
+        action_target_all = torch.cat(all_target_actions, dim=0).to(device).reshape(actions.size()[0], actions.size()[1],
+                                                                       actions.size()[2])
+        target_vf_in = torch.cat((next_obs, action_target_all), dim=2)
+        del action_target_all
         # 计算在目标网络下，基于贝尔曼方程得到当前情况的评价
-        target_value = rewards[:, index] + self.gamma * curr_agent.Critic_target(target_vf_in).squeeze(dim=0)
-        
-        # 將Agents的觀察資料降成一維
-        observations = torch.flatten(observations, 0, -1)
-        # 除錯用程式碼
-        #print('observations')
-        #print(observations.shape)
-        # 將Agents的動作機率降成一維
-        actions = torch.flatten(actions, 0, -1)
-        vf_in = torch.cat((observations, actions), dim=0)
-        actual_value = curr_agent.Critic(vf_in).squeeze(dim=0)
+        target_value = rewards[:, index] + self.gamma * curr_agent.Critic_target(target_vf_in).squeeze(dim=1)
+        del target_vf_in
+        vf_in = torch.cat((observations, actions), dim=2)
+        actual_value = curr_agent.Critic(vf_in).squeeze(dim=1)
+        del vf_in
         # 计算针对Critic的损失函数
         vf_loss = curr_agent.loss_td(actual_value, target_value.detach())
+        del target_value
+        del actual_value
 
         vf_loss.backward()
+        del vf_loss
         curr_agent.critic_train.step()
 
         curr_agent.actor_train.zero_grad()
-        # Agents觀測資料已經過降維處理，故作出修改
-        #curr_pol_out = curr_agent.Actor(observations[:, index])
-        curr_pol_out = curr_agent.Actor(observations)
+        curr_pol_out = curr_agent.Actor(observations[:, index])
         curr_pol_vf_in = curr_pol_out
         all_pol_acs = []
         for i in range(0, self.n):
@@ -157,12 +154,14 @@ class MADDPG(object):
             else:
                 all_pol_acs.append(self.agents[i].Actor(observations[:, i]).detach())
         vf_in = torch.cat((observations,
-                           torch.cat(all_pol_acs, dim=0).to(device)))
+                           torch.cat(all_pol_acs, dim=0).to(device).reshape(actions.size()[0], actions.size()[1],
+                                                                            actions.size()[2])), dim=2)
         # DDPG中针对Actor的损失函数
         pol_loss = -torch.mean(curr_agent.Critic(vf_in))
         pol_loss.backward()
         curr_agent.actor_train.step()
-
+        
+        
     def update(self, sample):
         for index in range(0, self.n):
             self.update_agent(sample, index)
