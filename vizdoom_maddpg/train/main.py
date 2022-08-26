@@ -16,6 +16,7 @@ from torch.multiprocessing import Process, Manager
 
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = "cpu"
 
 # 創立MADDPG架構的實例
 def get_trainers(env, obs_shape_n, action_shape_n):
@@ -114,8 +115,10 @@ def train():
                     new_obs_n[i] = np.append(new_obs_n[i], np.array([0.0]))
             '''
             
+            new_obs_list = []
+            new_obs_list.append(new_obs_n)
             # 將資訊紀錄於MADDPG結構的記憶體
-            maddpg.add_data(obs_n, action_n, rew_n, new_obs_n, done_n)
+            maddpg.add_data(obs_n, action_n, rew_n, new_obs_list, done_n)
             # 將所有Agents的章節獎勵加總
             episode_rewards[-1] += np.sum(rew_n)
             
@@ -127,7 +130,7 @@ def train():
             done = all(done_n)
             if step % 400 == 0:
                 # 更新神經網路，目前仍在修正中，尚未完成
-                maddpg.update(maddpg.memory.sample(1))
+                maddpg.update(maddpg.memory.sample(1600))
                 maddpg.update_all_agents()
             # 檢查章節是否結束
             if done or step == 1999:
