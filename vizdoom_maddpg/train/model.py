@@ -1,10 +1,11 @@
 import torch
 from torch import nn
 from memory import Memory
+import os
 
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+#device = "cpu"
 
 # Actor被设定为一个三层全连接神经网络，输出为(-1,1)
 class Actor(nn.Module):
@@ -64,20 +65,24 @@ class DDPGAgent(object):
         self.Actor = Actor(self.state_dim, self.action_dim, self.hidden, self.hidden).to(device)
         # local决定是用局部信息还是全局信息，也决定是DDPG算法还是MADDPG算法
         if not local:
+            #MADDPG
             self.Critic = Critic(sum(state_global), sum(action_global), self.hidden, self.hidden).to(device)
         else:
+            #DDPG
             self.Critic = Critic(self.state_dim, self.action_dim, self.hidden, self.hidden).to(device)
         self.Actor_target = Actor(self.state_dim, self.action_dim, self.hidden, self.hidden).to(device)
         if not local:
+            #MADDPG
             self.Critic_target = Critic(sum(state_global), sum(action_global), self.hidden, self.hidden).to(device)
         else:
+            #DDPG
             self.Critic_target = Critic(self.state_dim, self.action_dim, self.hidden, self.hidden).to(device)
         self.critic_train = torch.optim.Adam(self.Critic.parameters(), lr=LR_C)
         self.actor_train = torch.optim.Adam(self.Actor.parameters(), lr=LR_A)
-        self.loss_td = nn.MSELoss()
+        self.loss_td = nn.MSELoss().to(device)
         self.batch_size = batch_size
         self.gamma = gamma
-        self.tau = 0.5
+        self.tau = 0.25
         self.local = local
 
     # 輸出確切的Agent動作
@@ -99,7 +104,9 @@ class MADDPG(object):
         self.gamma = gamma
         self.memory = Memory(memory_size)
         # 由於訓練資料大，故將Batch size設定為1
-        self.agents = [DDPGAgent(index, 1600, 1, 0.5, state_global, action_global) for index in range(0, n)]
+        #self.agents = [DDPGAgent(index, 1600, 1, 0.5, state_global, action_global) for index in range(0, n)]
+        # alought change the batch size here, but the batch size of the epoch is determined in main.py
+        self.agents = [DDPGAgent(index, 1600, 400, 0.5, state_global, action_global) for index in range(0, n)]
 
     
     def update_agent(self, sample, index):
@@ -160,6 +167,7 @@ class MADDPG(object):
         pol_loss = -torch.mean(curr_agent.Critic(vf_in))
         pol_loss.backward()
         curr_agent.actor_train.step()
+        
         
         
     def update(self, sample):

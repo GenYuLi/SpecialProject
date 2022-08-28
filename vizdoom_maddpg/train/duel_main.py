@@ -1,6 +1,7 @@
 import torch
 import time
 import numpy as np
+from tqdm import tqdm
 
 from model import DDPGAgent, MADDPG
 
@@ -11,7 +12,7 @@ from torch.multiprocessing import Process, Manager, Event, Queue
 
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+#device = "cpu"
 
 # 創立MADDPG架構的實例
 def get_trainers(obs_shape_n, action_shape_n):
@@ -25,7 +26,7 @@ def player1(info_queue, action_queue, lock, event_obs, event_act, event_done):
     event_obs.set() # 存取首次觀察資料並傳遞後，通知主程序
     
     for episode in range(0, 10000):
-        for step in range(0, 2000):
+        for step in range(0, 500):
             event_act.wait() # 等待主程序傳遞動作資料
             new_obs_n, rew_n, done_n, info_n = env.step(action_queue.get())
             event_act.clear() # 重置訊號
@@ -46,7 +47,7 @@ def player1(info_queue, action_queue, lock, event_obs, event_act, event_done):
             #lock.release()
             event_done.clear()
             
-            if done or step == 1999:
+            if done or step == 499:
                 obs_tmp = env.reset()
                 obs_tmp = obs_tmp.reshape(-1)
                 info_queue.put(obs_tmp)
@@ -77,17 +78,19 @@ def train():
     # 每個Agent之觀察都是list obs_n中的一個元素
     obs_n = []
     obs_tmp = env.reset() # env.reset()初始化環境，並返回Agent初始觀察資料
+    #env.render()
     obs_tmp = obs_tmp.reshape(-1) # 將三維的觀察資料降成一維
     obs_n.append(obs_tmp)
+    
     
     event_obs.wait() # 等待player1取得首次觀察資料後在執行串接
     obs_n.append(info_queue.get())
     event_obs.clear() # 將訊號重置
     
     
-    for episode in range(0, 10000):
-        for step in range(0, 2000):
-            print(step)
+    for episode in tqdm(range(0, 10000)):
+        for step in range(0, 500):
+            #print(step)
             # 以機率形式輸出Agents的動作
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
                         for agent, obs in zip(maddpg.agents, obs_n)]
@@ -98,6 +101,8 @@ def train():
             # 返回的觀察資訊、獎勵、結束訊號、除錯資訊皆為list型態
             # 每個Agent為list中的一個元素
             new_obs_n, rew_n, done_n, info_n = env.step(action_n[0])
+            #time.sleep(0.1)
+            env.render()
             # 將list轉換為ndarray以執行降維
             new_obs_n = np.array(new_obs_n)
             new_obs_n = new_obs_n.reshape(-1) # 將三維的觀察資料降成一維
@@ -143,9 +148,9 @@ def train():
             #lock.release()
             event_done.set() # 等待存取完畢，再通知子程序
             
-            if step % 400 == 0:
+            if step % 200 == 0:
                 # 更新神經網路，目前仍在修正中，尚未完成
-                x = maddpg.memory.sample(6400)
+                x = maddpg.memory.sample(32)
                 
                 # 測試用
                 '''
@@ -157,11 +162,13 @@ def train():
                 maddpg.update_all_agents()
                 
             # 檢查章節是否結束
-            if done or step == 1999:
+            if done or step == 499:
                 # 每個Agent之觀察都是list obs_n中的一個元素
                 # 但目前該場景只有一個Agent，故暫時以此方式賦值
                 obs_n = []
+                env.close()
                 obs_tmp = env.reset()
+                env.render()
                 obs_tmp = obs_tmp.reshape(-1) # 將三維的觀察資料降成一維
                 obs_n.append(obs_tmp)
                 

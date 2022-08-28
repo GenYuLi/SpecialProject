@@ -3,7 +3,7 @@ import torch
 import numpy as np
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = "cpu"
+#device = "cpu"
 
 # 存储历史状态
 class Memory(object):
@@ -62,6 +62,7 @@ class Memory(object):
         print(len(self.memory))
         print(batch_size)
         '''
+        # if batch_size too big, then decrease to memory size.
         if len(self.memory) < batch_size:
             batch_size = len(self.memory)
         if batch_size > 0:
