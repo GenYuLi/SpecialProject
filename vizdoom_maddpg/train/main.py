@@ -99,8 +99,11 @@ def train(update_size=256,batch_size=32,step_size=513):
             print('error')
             obs_n[i] = np.append(obs_n[i], np.array([0.0]))
     '''
-    
-    for episode in tqdm(range(0, 10000)):
+    epochs = []
+    losses = []
+    rewards = []
+    loop = tqdm(range(10000),total=10000,desc = 'train')
+    for episode in loop:
         for step in range(0, step_size):
             # 以機率形式輸出Agents的動作
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
