@@ -11,14 +11,13 @@ from torch.multiprocessing import Process, Manager, Event, Queue
 
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = "cpu"
 
 # 創立MADDPG架構的實例
-def get_trainers(obs_shape_n, action_shape_n):
-    return MADDPG(2, obs_shape_n, action_shape_n, 0.7, 20000)
+def get_trainers(agent_num, obs_shape_n, action_shape_n):
+    return MADDPG(agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
 
-def player1(info_queue, action_queue, lock, event_obs, event_act, event_done):
-    env = gym.make('VizdoomMultipleInstances-v0', host=1)
+def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, event_act, event_done):
+    env = gym.make('VizdoomMultipleInstances-v0', host=host_arg, agent_num=agent_arg) # host參數為0意指創建本地伺服器端
     obs_tmp = env.reset()
     obs_tmp = obs_tmp.reshape(-1)
     info_queue.put(obs_tmp)
@@ -33,17 +32,13 @@ def player1(info_queue, action_queue, lock, event_obs, event_act, event_done):
             new_obs_n = np.array(new_obs_n)
             new_obs_n = new_obs_n.reshape(-1)
             # 將新的觀察資料、獎勵、完成訊號傳入主程序
-            #lock.acquire()
             info_queue.put(new_obs_n)
             info_queue.put(rew_n[-1])
             info_queue.put(done_n[-1])
-            #lock.release()
             event_obs.set() # 採取動作並完成處理後，將資料傳遞給主程序
             
             event_done.wait() # 等待父程序傳遞結束旗標
-            #lock.acquire()
             done = info_queue.get() # 取得結束旗標
-            #lock.release()
             event_done.clear()
             
             if done or step == 1999:
@@ -59,18 +54,17 @@ def player1(info_queue, action_queue, lock, event_obs, event_act, event_done):
 # 主要訓練函式
 def train():
     
-    agent_n = 2 # 該場景的agents數量
-    env = gym.make('VizdoomMultipleInstances-v0', host=0) # host參數為2意指執行單人模式場景(只有一個Agent)
+    env = gym.make('VizdoomMultipleInstances-v0', host=1) # host參數為1意指加入本地伺服器的客戶端
     
     obs_shape = 120*160*3 # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
     obs_shape_n = []  # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
     action_n = 8 # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(8)
     action_shape_n = [] # 設定Agents動作空間的形狀
-    for i in range(0, agent_n):
+    for i in range(0, agent_num):
         obs_shape_n.append(obs_shape)
         action_shape_n.append(action_n)
         
-    maddpg = get_trainers(obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
+    maddpg = get_trainers(agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
     
     # 初始化章節獎勵
     episode_rewards = [0.0] 
@@ -92,12 +86,15 @@ def train():
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
                         for agent, obs in zip(maddpg.agents, obs_n)]
             
-            action_queue.put(action_n[1])
+            # 取得機率值最大的動作索引值，並轉換為整數資料型態
+            p1_action = int(np.argmax(action_n[1]))
+            p2_action = int(np.argmax(action_n[0]))
+            action_queue.put(p1_action)
             event_act.set() # 等待action_n計算完成，再通知子程序
             
             # 返回的觀察資訊、獎勵、結束訊號、除錯資訊皆為list型態
             # 每個Agent為list中的一個元素
-            new_obs_n, rew_n, done_n, info_n = env.step(action_n[0])
+            new_obs_n, rew_n, done_n, info_n = env.step(p2_action)
             # 將list轉換為ndarray以執行降維
             new_obs_n = np.array(new_obs_n)
             new_obs_n = new_obs_n.reshape(-1) # 將三維的觀察資料降成一維
@@ -106,53 +103,26 @@ def train():
             
             
             event_obs.wait() # 等待子程序傳遞資料
-            #lock.acquire()
-            p1_obs = info_queue.get() # 取得子程序資料
-            p1_rew = info_queue.get()
-            p1_done = info_queue.get()
-            #lock.release()
-            
-            # 測試用
-            '''
-            print('p1_obs:')
-            print(p1_obs)
-            print('p1_rew:')
-            print(p1_rew)
-            print('p1_done:')
-            print(p1_done)
-            '''
-            new_obs_list.append(p1_obs)
-            rew_n.append(p1_rew)
-            done_n.append(p1_done)
+            new_obs_list.append(info_queue.get()) # 取得子程序資料 
+            rew_n.append(info_queue.get())
+            done_n.append(info_queue.get())
             event_obs.clear()
-            
-            
+              
             # 將資訊紀錄於MADDPG結構的記憶體
             maddpg.add_data(obs_n, action_n, rew_n, new_obs_list, done_n)
             # 將所有Agents的章節獎勵加總
             episode_rewards[-1] += np.sum(rew_n)
             
             # 每個Agent之觀察都是list obs_n中的一個元素
-            obs_n = []
-            obs_n.append(new_obs_n)
-            obs_n.append(new_obs_list[-1])
+            obs_n = new_obs_list
             
             done = all(done_n)
-            #lock.acquire()
             info_queue.put(done) # 將結束旗標傳遞給子程序 
-            #lock.release()
             event_done.set() # 等待存取完畢，再通知子程序
             
             if step % 400 == 0:
                 # 更新神經網路，目前仍在修正中，尚未完成
-                x = maddpg.memory.sample(6400)
-                
-                # 測試用
-                '''
-                print('this is x:')
-                print(type(x))
-                print(x)
-                '''
+                x = maddpg.memory.sample(batch_size)
                 maddpg.update(x)
                 maddpg.update_all_agents()
                 
@@ -181,6 +151,9 @@ def train():
 
 
 if __name__ == '__main__':
+    agent_num = 2
+    host_arg = 0
+    batch_size = 100
     
     manager = Manager()
     # 創建queue作為主程序與子程序的溝通管道
@@ -193,7 +166,7 @@ if __name__ == '__main__':
     event_act = Event()
     event_done = Event()
     
-    player1_proc = Process(target=player1, args=(info_queue, action_queue, lock, event_obs, event_act, event_done))
+    player1_proc = Process(target=player1, args=(host_arg, agent_num, info_queue, action_queue, lock, event_obs, event_act, event_done))
     player1_proc.start()
     train()
     player1_proc.join()
