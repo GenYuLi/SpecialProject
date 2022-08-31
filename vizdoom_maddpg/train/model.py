@@ -4,7 +4,6 @@ from memory import Memory
 
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = "cpu"
 
 # Actor被设定为一个三层全连接神经网络，输出为(-1,1)
 class Actor(nn.Module):
