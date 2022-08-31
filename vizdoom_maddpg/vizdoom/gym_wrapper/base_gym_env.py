@@ -18,7 +18,8 @@ class VizdoomEnv(gym.Env):
     def __init__(
         self,
         level,
-        host,
+        host=-1,
+        agent_num=1,
         frame_skip=1,
         max_buttons_pressed=1,
     ):
@@ -98,19 +99,27 @@ class VizdoomEnv(gym.Env):
         # specify observation space(s)
         self.observation_space = self.__get_observation_space()
 		
-        if host == 0:
+        if host == -1:
+            print("Access single-player mode.")
+        elif host == 0:
+            args = "-host " + str(agent_num) + " -deathmatch +timelimit 1 +sv_spawnfarthest 1"
+            self.game.add_game_args(args)
+            self.game.add_game_args("+name Player0 +colorset 0")
+        else:
             self.game.add_game_args("-join 127.0.0.1")
-            self.game.add_game_args("+name Player2 +colorset 3")
-        elif host == 1:
-            self.game.add_game_args("-host 2 -deathmatch +timelimit 1 +sv_spawnfarthest 1")
-            self.game.add_game_args("+name Player1 +colorset 0")
+            args = "+name Player" + str(host) + " +colorset " + str(host)
+            self.game.add_game_args(args)
         self.game.init()
 
     def step(self, action):
         #assert self.action_space.contains(action), f"{action!r} ({type(action)}) invalid"
         #assert self.state is not None, "Call `reset` before using `step` method."
 
+        print('action:')
+        print(action)
         env_action = self.__build_env_action(action)
+        print('env_action:')
+        print(env_action)
         reward = self.game.make_action(env_action, self.frame_skip)
         self.state = self.game.get_state()
         done = self.game.is_episode_finished()
@@ -137,7 +146,8 @@ class VizdoomEnv(gym.Env):
                 agent_action = self.button_map[agent_action]
 
             # binary actions offset by number of delta buttons
-            #env_action[self.num_delta_buttons:] = agent_action
+            env_action[self.num_delta_buttons:] = agent_action
+            # 已取消註解
 
     def __parse_delta_buttons(self, env_action, agent_action):
         if self.num_delta_buttons != 0:
