@@ -63,7 +63,7 @@ class ObservationWrapper(gym.ObservationWrapper):
     
 # 主要訓練函式
 # batch size <= 1600
-def train(update_size=128,batch_size=32,step_size=513):
+def train(update_size=64,batch_size=32,step_size=513):
     # host參數為2意指執行單人模式場景(只有一個Agent)
     env = gym.make('VizdoomBasic-v0', host=2)
     
@@ -102,7 +102,7 @@ def train(update_size=128,batch_size=32,step_size=513):
     epochs = []
     losses = []
     rewards = []
-    loop = tqdm(range(10000),total=10000,desc = 'train')
+    loop = tqdm(range(10001),total=10000,desc = 'train')
     for episode in loop:
         for step in range(0, step_size):
             # 以機率形式輸出Agents的動作
@@ -197,7 +197,7 @@ def play():
     action_shape_n.append(4)
     # 創立MADDPG架構的實例
     maddpg = get_trainers(env, obs_shape_n, action_shape_n)
-    maddpg.load_model(200)
+    maddpg.load_model(9000)
     # 初始化章節獎勵
     episode_rewards = [0.0]
     # 每個Agent之觀察都是list obs_n中的一個元素
@@ -210,8 +210,12 @@ def play():
     obs_tmp = obs_tmp.reshape(-1)
     obs_n.append(obs_tmp)
     
-    for episode in range(0, 10000):
-        for step in range(0, 2000):
+    for episode in range(0, 12):
+        #for step in range(0, 10000000):
+        done = False
+        #count = 0
+        print('episode:',episode)
+        while True:
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
                         for agent, obs in zip(maddpg.agents, obs_n)]
             # 返回的觀察資訊、獎勵、結束訊號、除錯資訊皆為list型態
@@ -223,9 +227,11 @@ def play():
                 if action_n[0][i]>action_n[0][act]:
                     act = i
             new_obs_n, rew_n, done_n, info_n = env.step(act)
-            print(rew_n)
-            time.sleep(0.05)
-            env.render()
+            #print(rew_n)
+            #time.sleep(0.015)
+            #if count ==5:
+            #    env.render()
+            #count = (count+1)%6
             # 將list轉換為ndarray以執行降維
             new_obs_n = np.array(new_obs_n)
             # 將三維的觀察資料降成一維
@@ -248,11 +254,12 @@ def play():
             obs_n = []
             obs_n.append(new_obs_n)
             done = all(done_n)
-            if done or step == 2000:
+            if done :
                 # 每個Agent之觀察都是list obs_n中的一個元素
                 # 但目前該場景只有一個Agent，故暫時以此方式賦值
                 obs_n = []
                 obs_tmp = env.reset()
+                time.sleep(1)
                 env.render()
                 # 將三維的觀察資料降成一維
                 obs_tmp = obs_tmp.reshape(-1)
@@ -261,5 +268,5 @@ def play():
 
 
 if __name__ == '__main__':
-    train()
-    #play()
+    #train()
+    play()
