@@ -260,7 +260,7 @@ def play():
                 obs_n = []
                 obs_tmp = env.reset()
                 time.sleep(1)
-                env.render()
+                #env.render()
                 # 將三維的觀察資料降成一維
                 obs_tmp = obs_tmp.reshape(-1)
                 obs_n.append(obs_tmp)
