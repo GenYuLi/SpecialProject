@@ -61,6 +61,7 @@ class Memory(object):
         print(len(self.memory))
         print(batch_size)
         '''
+        # if batch_size too big, then decrease to memory size.
         if len(self.memory) < batch_size:
             batch_size = len(self.memory)
         if batch_size > 0:

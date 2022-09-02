@@ -1,6 +1,7 @@
 import torch
 import time
 import numpy as np
+from tqdm import tqdm
 
 from model import DDPGAgent, MADDPG
 
@@ -76,17 +77,19 @@ def train():
     # 每個Agent之觀察都是list obs_n中的一個元素
     obs_n = []
     obs_tmp = env.reset() # env.reset()初始化環境，並返回Agent初始觀察資料
+    #env.render()
     obs_tmp = obs_tmp.reshape(-1) # 將三維的觀察資料降成一維
     obs_n.append(obs_tmp)
+    
     
     event_obs.wait() # 等待player1取得首次觀察資料後在執行串接
     obs_n.append(info_queue.get())
     event_obs.clear() # 將訊號重置
     
     
-    for episode in range(0, 10000):
+    for episode in tqdm(range(0, 10000)):
         for step in range(0, 2000):
-            print(step)
+            #print(step)
             # 以機率形式輸出Agents的動作
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
                         for agent, obs in zip(maddpg.agents, obs_n)]
