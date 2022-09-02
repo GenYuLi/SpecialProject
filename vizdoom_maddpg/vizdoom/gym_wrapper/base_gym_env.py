@@ -102,7 +102,7 @@ class VizdoomEnv(gym.Env):
         if host == -1:
             print("Access single-player mode.")
         elif host == 0:
-            args = "-host " + str(agent_num) + " -deathmatch +timelimit 1 +sv_spawnfarthest 1"
+            args = "-host " + str(agent_num) + " -deathmatch -netmode 0 +timelimit 1 +sv_spawnfarthest 1"
             self.game.add_game_args(args)
             self.game.add_game_args("+name Player0 +colorset 0")
         else:
@@ -267,6 +267,18 @@ class VizdoomEnv(gym.Env):
             pygame.display.update()
         else:
             return self.isopen
+    
+    # 除錯用函式
+    def check(self):
+        if self.game.is_player_dead():
+            return True
+        else:
+            return False
+        
+    # 當場景創建時，場內角色會死亡，因此必須先將其復活
+    def check_is_player_dead(self):
+        if self.game.is_player_dead():
+            self.game.respawn_player()
 
     def close(self):
         if self.window_surface:

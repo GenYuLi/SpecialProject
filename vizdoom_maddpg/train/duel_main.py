@@ -17,7 +17,10 @@ def get_trainers(agent_num, obs_shape_n, action_shape_n):
     return MADDPG(agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
 
 def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, event_act, event_done):
-    env = gym.make('VizdoomMultipleInstances-v0', host=host_arg, agent_num=agent_arg) # host參數為0意指創建本地伺服器端
+    env = gym.make('MaddpgDuel-v0', host=host_arg, agent_num=agent_arg) # host參數為0意指創建本地伺服器端
+    # 當場景創建時，場內角色會死亡，因此必須先將其復活
+    env.check_is_player_dead()
+    
     obs_tmp = env.reset()
     obs_tmp = obs_tmp.reshape(-1)
     info_queue.put(obs_tmp)
@@ -54,11 +57,13 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
 # 主要訓練函式
 def train():
     
-    env = gym.make('VizdoomMultipleInstances-v0', host=1) # host參數為1意指加入本地伺服器的客戶端
+    env = gym.make('MaddpgDuel-v0', host=1) # host參數為1意指加入本地伺服器的客戶端
+    # 當場景創建時，場內角色會死亡，因此必須先將其復活
+    env.check_is_player_dead()
     
     obs_shape = 120*160*3 # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
     obs_shape_n = []  # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
-    action_n = 8 # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(8)
+    action_n = 4 # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(8)
     action_shape_n = [] # 設定Agents動作空間的形狀
     for i in range(0, agent_num):
         obs_shape_n.append(obs_shape)

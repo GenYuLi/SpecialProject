@@ -65,3 +65,15 @@ register(
     entry_point="vizdoom.gym_wrapper.gym_env_defns:VizdoomScenarioEnv",
     kwargs={"scenario_file": "multi.cfg"}
 )
+
+register(
+    id="MaddpgDuel-v0",
+    entry_point="vizdoom.gym_wrapper.gym_env_defns:VizdoomScenarioEnv",
+    kwargs={"scenario_file": "maddpg_duel.cfg"}
+)
+
+register(
+    id="MaddpgQuad-v0",
+    entry_point="vizdoom.gym_wrapper.gym_env_defns:VizdoomScenarioEnv",
+    kwargs={"scenario_file": "maddpg_quad.cfg"}
+)
