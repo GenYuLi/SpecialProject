@@ -13,8 +13,8 @@ from torch.multiprocessing import Process, Manager, Event, Queue
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 創立MADDPG架構的實例
-def get_trainers(agent_num, obs_shape_n, action_shape_n):
-    return MADDPG(agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
+def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
+    return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
 
 def player(host_arg, agent_arg, player_queue, lock, event_obs, event_act, event_done):
     env = gym.make('VizdoomMultipleInstances-v0', host=host_arg, agent_num=agent_arg) # host參數為0意指創建本地伺服器端
@@ -62,7 +62,7 @@ def train():
         obs_shape_n.append(obs_shape)
         action_shape_n.append(action_n)
         
-    maddpg = get_trainers(agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
+    maddpg = get_trainers('MaddpgQuad',agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
     # 初始化章節獎勵
     episode_rewards = [0.0] 
     # 每個Agent之觀察都是list obs_n中的一個元素

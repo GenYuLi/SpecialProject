@@ -2,6 +2,7 @@ import torch
 import time
 import numpy as np
 from tqdm import tqdm
+import os
 
 from model import DDPGAgent, MADDPG
 
@@ -14,8 +15,8 @@ from torch.multiprocessing import Process, Manager, Event, Queue
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 創立MADDPG架構的實例
-def get_trainers(agent_num, obs_shape_n, action_shape_n):
-    return MADDPG(agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
+def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
+    return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
 
 def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, event_act, event_done):
     env = gym.make('MaddpgDuel-v0', host=host_arg, agent_num=agent_arg) # host參數為0意指創建本地伺服器端
@@ -64,13 +65,15 @@ def train():
     
     obs_shape = 120*160*3 # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
     obs_shape_n = []  # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
+    print(env.action_space)
+    os.system("pause")
     action_n = 4 # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(8)
     action_shape_n = [] # 設定Agents動作空間的形狀
     for i in range(0, agent_num):
         obs_shape_n.append(obs_shape)
         action_shape_n.append(action_n)
         
-    maddpg = get_trainers(agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
+    maddpg = get_trainers('MaddpgDuel',agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
     
     # 初始化章節獎勵
     episode_rewards = [0.0] 

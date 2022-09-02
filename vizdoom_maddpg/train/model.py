@@ -98,7 +98,7 @@ class DDPGAgent(object):
 
 
 class MADDPG(object):
-    def __init__(self, n, state_global, action_global, gamma, memory_size):
+    def __init__(self,model_name, n, state_global, action_global, gamma, memory_size):
         self.n = n
         self.gamma = gamma
         self.memory = Memory(memory_size)
@@ -106,6 +106,8 @@ class MADDPG(object):
         #self.agents = [DDPGAgent(index, 1600, 1, 0.5, state_global, action_global) for index in range(0, n)]
         # alought change the batch size here, but the batch size of the epoch is determined in main.py
         self.agents = [DDPGAgent(index, 1600, 400, 0.5, state_global, action_global) for index in range(0, n)]
+        self.model_name=model_name
+        self.model_count=0
 
     
     def update_agent(self, sample, index):
@@ -183,15 +185,16 @@ class MADDPG(object):
 
     def save_model(self, episode):
         for i in range(0, self.n):
-            model_name_c = "Critic_Agent" + str(i) + "_" + str(episode) + ".pt"
-            model_name_a = "Actor_Agent" + str(i) + "_" + str(episode) + ".pt"
+            model_name_c = self.model_name+"_Critic_Agent" + str(i) + "_" + str(episode+self.model_count) + ".pt"
+            model_name_a = self.model_name+"_Actor_Agent" + str(i) + "_" + str(episode+self.model_count) + ".pt"
             torch.save(self.agents[i].Critic_target, 'model_tag/' + model_name_c)
             torch.save(self.agents[i].Actor_target, 'model_tag/' + model_name_a)
 
     def load_model(self, episode):
+        self.model_count=episode
         for i in range(0, self.n):
-            model_name_c = "Critic_Agent" + str(i) + "_" + str(episode) + ".pt"
-            model_name_a = "Actor_Agent" + str(i) + "_" + str(episode) + ".pt"
+            model_name_c = self.model_name+"_Critic_Agent" + str(i) + "_" + str(episode) + ".pt"
+            model_name_a = self.model_name+"_Actor_Agent" + str(i) + "_" + str(episode) + ".pt"
             self.agents[i].Critic_target = torch.load("model_tag/" + model_name_c)
             self.agents[i].Critic = torch.load("model_tag/" + model_name_c)
             self.agents[i].Actor_target = torch.load("model_tag/" + model_name_a)

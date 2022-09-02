@@ -16,12 +16,12 @@ from torch.multiprocessing import Process, Manager
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 創立MADDPG架構的實例
-def get_trainers(agent_num, obs_shape_n, action_shape_n):
-    return MADDPG(agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
+def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
+    return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
     
 # 主要訓練函式
 # batch size <= 1600
-def train(update_size=64,batch_size=32,step_size=513):
+def train(update_size=64,batch_size=32,step_size=1000):
     # host參數為-1(預設)意指執行單人模式場景(只有一個Agent)
     env = gym.make('VizdoomBasic-v0', host=-1)
     
@@ -37,7 +37,8 @@ def train(update_size=64,batch_size=32,step_size=513):
     # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(4)
     action_shape_n.append(4)
     # 創立MADDPG架構的實例
-    maddpg = get_trainers(agent_num, obs_shape_n, action_shape_n)
+    maddpg = get_trainers('MaddpgSolo',agent_num, obs_shape_n, action_shape_n)
+    maddpg.load_model(9000)
     # 初始化章節獎勵
     episode_rewards = [0.0]
     # 每個Agent之觀察都是list obs_n中的一個元素
@@ -110,7 +111,7 @@ def train(update_size=64,batch_size=32,step_size=513):
 # 以訓練完成的模型執行程式，暫未處理
 
 def play():
-    env = gym.make('VizdoomBasic-v0', host=2)
+    env = gym.make('VizdoomBasic-v0', host=-1)
     
     # 可透過類別縮放訓練影像像素，但需要額外的修改
     #env = ObservationWrapper(env)
@@ -197,7 +198,6 @@ def play():
 
 if __name__ == '__main__':
     agent_num = 1
-    batch_size = 1600
     
     train()
     #play()
