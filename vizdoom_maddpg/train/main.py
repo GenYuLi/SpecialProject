@@ -38,7 +38,6 @@ def train(update_size=64,batch_size=32,step_size=1000):
     action_shape_n.append(4)
     # 創立MADDPG架構的實例
     maddpg = get_trainers('MaddpgSolo',agent_num, obs_shape_n, action_shape_n)
-    maddpg.load_model(9000)
     # 初始化章節獎勵
     episode_rewards = [0.0]
     # 每個Agent之觀察都是list obs_n中的一個元素
