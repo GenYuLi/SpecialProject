@@ -18,10 +18,17 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # 創立MADDPG架構的實例
 def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
     return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
+
+def get_act(action_n):
+    act= 0
+    for i in range(4):
+        if action_n[0][i]>action_n[0][act]:
+            act = i
+    return act
     
 # 主要訓練函式
 # batch size <= 1600
-def train(update_size=64,batch_size=32,step_size=1000):
+def train(update_size=150,batch_size=50,step_size=1000):
     # host參數為-1(預設)意指執行單人模式場景(只有一個Agent)
     env = gym.make('VizdoomBasic-v0', host=-1)
     
@@ -51,19 +58,24 @@ def train(update_size=64,batch_size=32,step_size=1000):
     obs_n.append(obs_tmp)
     
     epochs = []
+    epoch=0
     losses = []
     rewards = []
     loop = tqdm(range(10001),total=10000,desc = 'train')
     for episode in loop:
+        print('epoch = ',epoch)
         for step in range(0, step_size):
             # 以機率形式輸出Agents的動作
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
                         for agent, obs in zip(maddpg.agents, obs_n)]
-            # 取得機率值最大的動作索引值，並轉換為整數資料型態
-            action = int(np.argmax(action_n[0]))
+            # 取得機率值最大的動作索引值，並轉換為整數資料型態       
+            #print(action_n)     
+            act= get_act(action_n)
+            #action = int(np.argmax(action_n[0]))
             # 返回的觀察資訊、獎勵、結束訊號、除錯資訊皆為list型態
             # 每個Agent為list中的一個元素
-            new_obs_n, rew_n, done_n, info_n = env.step(action)
+            #new_obs_n, rew_n, done_n, info_n = env.step(action)
+            new_obs_n, rew_n, done_n, info_n = env.step(act)
             # 將list轉換為ndarray以執行降維
             new_obs_n = np.array(new_obs_n)
             # 將三維的觀察資料降成一維
@@ -85,6 +97,7 @@ def train(update_size=64,batch_size=32,step_size=1000):
             if step % update_size == 0:
                 # 更新神經網路，目前仍在修正中，尚未完成
                 maddpg.update(maddpg.memory.sample(batch_size))
+                epoch=epoch+1
                 maddpg.update_all_agents()
             # 檢查章節是否結束
             if done or step == step_size-1:
@@ -92,7 +105,6 @@ def train(update_size=64,batch_size=32,step_size=1000):
                 # 但目前該場景只有一個Agent，故暫時以此方式賦值
                 obs_n = []
                 obs_tmp = env.reset()
-                #env.render()
                 # 將三維的觀察資料降成一維
                 obs_tmp = obs_tmp.reshape(-1)
                 obs_n.append(obs_tmp)
@@ -104,7 +116,7 @@ def train(update_size=64,batch_size=32,step_size=1000):
                 break
             
         # 每隔100章節儲存一次訓練模型
-        if episode % 100 == 0:
+        if episode % 1000 == 0 and episode != 0:
             maddpg.save_model(episode)
 
 # 以訓練完成的模型執行程式，暫未處理
@@ -124,7 +136,7 @@ def play():
     # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(4)
     action_shape_n.append(4)
     # 創立MADDPG架構的實例
-    maddpg = get_trainers(env, obs_shape_n, action_shape_n)
+    maddpg = get_trainers('MaddpgSolo',agent_num, obs_shape_n, action_shape_n)
     maddpg.load_model(9000)
     # 初始化章節獎勵
     episode_rewards = [0.0]
@@ -138,7 +150,7 @@ def play():
     obs_tmp = obs_tmp.reshape(-1)
     obs_n.append(obs_tmp)
     
-    for episode in range(0, 12):
+    for episode in range(0, 40):
         #for step in range(0, 10000000):
         done = False
         #count = 0
@@ -187,8 +199,6 @@ def play():
                 # 但目前該場景只有一個Agent，故暫時以此方式賦值
                 obs_n = []
                 obs_tmp = env.reset()
-                time.sleep(1)
-                #env.render()
                 # 將三維的觀察資料降成一維
                 obs_tmp = obs_tmp.reshape(-1)
                 obs_n.append(obs_tmp)
@@ -197,7 +207,6 @@ def play():
 
 if __name__ == '__main__':
     agent_num = 1
-    
-    train()
-    #play()
+    #train()
+    play()
     print('finish!')
