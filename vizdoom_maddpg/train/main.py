@@ -21,6 +21,8 @@ def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
 
 def get_act(action_n):
     act= 0
+    #print(action_n)
+    #system("pause")
     for i in range(4):
         if action_n[0][i]>action_n[0][act]:
             act = i
@@ -28,7 +30,7 @@ def get_act(action_n):
     
 # 主要訓練函式
 # batch size <= 1600
-def train(update_size=150,batch_size=50,step_size=1000):
+def train(update_size=100,batch_size=150,step_size=500):
     # host參數為-1(預設)意指執行單人模式場景(只有一個Agent)
     env = gym.make('VizdoomBasic-v0', host=-1)
     
@@ -37,14 +39,19 @@ def train(update_size=150,batch_size=50,step_size=1000):
     
     # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
     obs_shape_n = []
+    obs_shape =[]
     # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
-    obs_shape_n.append(120*160*3)
+    obs_shape.append(120)
+    obs_shape.append(160)
+    obs_shape.append(3)
+    obs_shape_n.append(obs_shape)
     # 設定Agents動作空間的形狀
     action_shape_n = []
     # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(4)
     action_shape_n.append(4)
     # 創立MADDPG架構的實例
     maddpg = get_trainers('MaddpgSolo',agent_num, obs_shape_n, action_shape_n)
+    #maddpg.load_model(9000)
     # 初始化章節獎勵
     episode_rewards = [0.0]
     # 每個Agent之觀察都是list obs_n中的一個元素
@@ -65,11 +72,13 @@ def train(update_size=150,batch_size=50,step_size=1000):
     for episode in loop:
         print('epoch = ',epoch)
         for step in range(0, step_size):
+            #print(step)
             # 以機率形式輸出Agents的動作
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
                         for agent, obs in zip(maddpg.agents, obs_n)]
             # 取得機率值最大的動作索引值，並轉換為整數資料型態       
-            #print(action_n)     
+            #print(action_n)    
+            #print(action_n) 
             act= get_act(action_n)
             #action = int(np.argmax(action_n[0]))
             # 返回的觀察資訊、獎勵、結束訊號、除錯資訊皆為list型態
@@ -114,7 +123,6 @@ def train(update_size=150,batch_size=50,step_size=1000):
                 # 初始化下一章節的獎勵
                 episode_rewards.append(0.0)
                 break
-            
         # 每隔100章節儲存一次訓練模型
         if episode % 1000 == 0 and episode != 0:
             maddpg.save_model(episode)
@@ -127,17 +135,22 @@ def play():
     # 可透過類別縮放訓練影像像素，但需要額外的修改
     #env = ObservationWrapper(env)
     
+    
     # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
     obs_shape_n = []
+    obs_shape =[]
     # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
-    obs_shape_n.append(120*160*3)
+    obs_shape.append(120)
+    obs_shape.append(160)
+    obs_shape.append(3)
+    obs_shape_n.append(obs_shape)
     # 設定Agents動作空間的形狀
     action_shape_n = []
     # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(4)
     action_shape_n.append(4)
     # 創立MADDPG架構的實例
     maddpg = get_trainers('MaddpgSolo',agent_num, obs_shape_n, action_shape_n)
-    maddpg.load_model(9000)
+    maddpg.load_model(10000)
     # 初始化章節獎勵
     episode_rewards = [0.0]
     # 每個Agent之觀察都是list obs_n中的一個元素
@@ -156,7 +169,7 @@ def play():
         #count = 0
         print('episode:',episode)
         while True:
-            action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
+            action_n = [agent.act(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
                         for agent, obs in zip(maddpg.agents, obs_n)]
             # 返回的觀察資訊、獎勵、結束訊號、除錯資訊皆為list型態
             # 每個Agent為list中的一個元素
@@ -207,6 +220,6 @@ def play():
 
 if __name__ == '__main__':
     agent_num = 1
-    #train()
-    play()
+    train()
+    #play()
     print('finish!')
