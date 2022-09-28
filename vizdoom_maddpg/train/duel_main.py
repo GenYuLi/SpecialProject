@@ -18,11 +18,14 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
     return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
 
-def get_act(action_n):
+def get_act(action_n, train=True):
     act= 0
-    for i in range(4):
-        if action_n[0][i]>action_n[0][act]:
-            act = i
+    if train:
+        act = np.random.choice(action_n[0])
+    else:
+        for i in range(4):
+            if action_n[0][i]>action_n[0][act]:
+                act = i
     return act
 
 def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, event_act, event_done):
@@ -64,7 +67,7 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
             
     
 # 主要訓練函式
-def train(update_size=400,batch_size=200,step_size=2001):
+def train(update_size=150,batch_size=300,step_size=2001):
     
     env = gym.make('MaddpgDuel-v0', host=1) # host參數為1意指加入本地伺服器的客戶端
     # 當場景創建時，場內角色會死亡，因此必須先將其復活

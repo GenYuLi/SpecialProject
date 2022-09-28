@@ -138,7 +138,7 @@ class DDPGAgent(object):
 
 
 class MADDPG(object):
-    def __init__(self,model_name, n, state_global, action_global, gamma, memory_size, conv=False):
+    def __init__(self,model_name, n, state_global, action_global, gamma, memory_size, conv=True):
         self.n = n
         self.gamma = gamma
         self.memory = Memory(memory_size)
