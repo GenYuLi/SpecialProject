@@ -19,12 +19,13 @@ def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
     return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
 
 def get_act(action_n, train=True):
+    #print(action_n)
     act= 0
     if train:
-        act = np.random.choice(action_n[0])
+        act = np.random.choice(action_n)
     else:
         for i in range(4):
-            if action_n[0][i]>action_n[0][act]:
+            if action_n[i]>action_n[act]:
                 act = i
     return act
 
@@ -73,7 +74,11 @@ def train(update_size=150,batch_size=300,step_size=2001):
     # 當場景創建時，場內角色會死亡，因此必須先將其復活
     env.check_is_player_dead()
     
-    obs_shape = 120*160*3 # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
+    # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
+    obs_shape = []
+    obs_shape.append(120)
+    obs_shape.append(160)
+    obs_shape.append(3)
     obs_shape_n = []  # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
     #print(env.action_space)
     #os.system("pause")
@@ -168,7 +173,7 @@ def train(update_size=150,batch_size=300,step_size=2001):
                 break
             
         # 每隔100章節儲存一次訓練模型
-        if episode % 100 == 0:
+        if episode % 1000 == 0:
             maddpg.save_model(episode)
 
 

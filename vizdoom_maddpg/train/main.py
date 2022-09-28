@@ -22,10 +22,10 @@ def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
 def get_act(action_n, train=True):
     act= 0
     if train:
-        act = np.random.choice(action_n[0])
+        act = np.random.choice(action_n)
     else:
         for i in range(4):
-            if action_n[0][i]>action_n[0][act]:
+            if action_n[i]>action_n[act]:
                 act = i
     return act
     
@@ -79,8 +79,7 @@ def train(update_size=100,batch_size=150,step_size=500):
                         for agent, obs in zip(maddpg.agents, obs_n)]
             # 取得機率值最大的動作索引值，並轉換為整數資料型態       
             #print(action_n)    
-            #print(action_n) 
-            act= get_act(action_n,True)
+            act= get_act(action_n[0],True)
             #action = int(np.argmax(action_n[0]))
             # 返回的觀察資訊、獎勵、結束訊號、除錯資訊皆為list型態
             # 每個Agent為list中的一個元素
@@ -218,6 +217,6 @@ def play():
 
 if __name__ == '__main__':
     agent_num = 1
-    #train()
-    play()
+    train()
+    #play()
     print('finish!')

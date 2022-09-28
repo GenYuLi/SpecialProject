@@ -17,7 +17,7 @@ class Actor(nn.Module):
         self.conv1 = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=10, kernel_size=5), nn.ReLU(True))
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Sequential(nn.Conv2d(in_channels=10, out_channels=30,kernel_size=5), nn.ReLU(True))
-        #print(state_dim)
+        #print('state_dim: ',state_dim)
         state_dim_0 = (((state_dim[0]-4)/2-4)/2)
         state_dim_1 = (((state_dim[1]-4)/2-4)/2)
         state_dim_0 = int(state_dim_0)
