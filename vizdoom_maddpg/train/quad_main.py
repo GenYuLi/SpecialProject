@@ -25,6 +25,9 @@ def player(host_arg, agent_arg, player_queue, lock, event_obs, event_act, event_
     
     for episode in range(0, 10000):
         for step in range(0, 2000):
+            # 當場景創建時，場內角色會死亡，因此必須先將其復活
+            env.check_is_player_dead()
+            
             event_act.wait() # 等待主程序傳遞動作資料
             new_obs_n, rew_n, done_n, info_n = env.step(player_queue.get())
             event_act.clear() # 重置訊號
@@ -43,6 +46,8 @@ def player(host_arg, agent_arg, player_queue, lock, event_obs, event_act, event_
             
             if done or step == 1999:
                 obs_tmp = env.reset()
+                # 當場景創建時，場內角色會死亡，因此必須先將其復活
+                env.check_is_player_dead()
                 obs_tmp = obs_tmp.reshape(-1)
                 player_queue.put(obs_tmp)
                 event_obs.set() # 存取觀察資料並傳遞後，通知主程序
@@ -85,6 +90,9 @@ def train():
     
     for episode in range(0, 10000):
         for step in range(0, 2000):
+            # 當場景創建時，場內角色會死亡，因此必須先將其復活
+            env.check_is_player_dead()
+            
             print(step)
             # 以機率形式輸出Agents的動作
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
@@ -151,6 +159,8 @@ def train():
                 # 但目前該場景只有一個Agent，故暫時以此方式賦值
                 obs_n = []
                 obs_tmp = env.reset()
+                # 當場景創建時，場內角色會死亡，因此必須先將其復活
+                env.check_is_player_dead()
                 obs_tmp = obs_tmp.reshape(-1) # 將三維的觀察資料降成一維
                 obs_n.append(obs_tmp)
                 
