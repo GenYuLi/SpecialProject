@@ -31,9 +31,6 @@ def get_act(action_n, train=True):
 
 def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, event_act, event_done):
     env = gym.make('MaddpgDuel-v0', host=host_arg, agent_num=agent_arg) # host參數為0意指創建本地伺服器端
-    # 當場景創建時，場內角色會死亡，因此必須先將其復活
-    env.check_is_player_dead()
-    
     obs_tmp = env.reset()
     obs_tmp = obs_tmp.reshape(-1)
     info_queue.put(obs_tmp)
@@ -41,6 +38,9 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
     
     for episode in range(0, 10000):
         for step in range(0, 2000):
+            # 當場景創建時，場內角色會死亡，因此必須先將其復活
+            env.check_is_player_dead()
+            
             event_act.wait() # 等待主程序傳遞動作資料
             new_obs_n, rew_n, done_n, info_n = env.step(action_queue.get())
             event_act.clear() # 重置訊號
@@ -59,6 +59,8 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
             
             if done or step == 1999:
                 obs_tmp = env.reset()
+                # 當場景創建時，場內角色會死亡，因此必須先將其復活
+                env.check_is_player_dead()
                 obs_tmp = obs_tmp.reshape(-1)
                 info_queue.put(obs_tmp)
                 event_obs.set() # 存取觀察資料並傳遞後，通知主程序
@@ -71,8 +73,6 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
 def train(update_size=150,batch_size=300,step_size=2001):
     
     env = gym.make('MaddpgDuel-v0', host=1) # host參數為1意指加入本地伺服器的客戶端
-    # 當場景創建時，場內角色會死亡，因此必須先將其復活
-    env.check_is_player_dead()
     
     # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
     obs_shape = []
@@ -81,7 +81,6 @@ def train(update_size=150,batch_size=300,step_size=2001):
     obs_shape.append(3)
     obs_shape_n = []  # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
     #print(env.action_space)
-    #os.system("pause")
     action_n = 4 # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(8)
     action_shape_n = [] # 設定Agents動作空間的形狀
     for i in range(0, agent_num):
@@ -95,7 +94,6 @@ def train(update_size=150,batch_size=300,step_size=2001):
     # 每個Agent之觀察都是list obs_n中的一個元素
     obs_n = []
     obs_tmp = env.reset() # env.reset()初始化環境，並返回Agent初始觀察資料
-    #env.render()
     obs_tmp = obs_tmp.reshape(-1) # 將三維的觀察資料降成一維
     obs_n.append(obs_tmp)
     
@@ -104,10 +102,10 @@ def train(update_size=150,batch_size=300,step_size=2001):
     obs_n.append(info_queue.get())
     event_obs.clear() # 將訊號重置
     
-    
     for episode in tqdm(range(0, 10001)):
         for step in range(0, step_size):
             #print(step)
+            # 當場景創建時，場內角色會死亡，因此必須先將其復活
             env.check_is_player_dead()
             # 以機率形式輸出Agents的動作
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
@@ -159,6 +157,7 @@ def train(update_size=150,batch_size=300,step_size=2001):
                 # 但目前該場景只有一個Agent，故暫時以此方式賦值
                 obs_n = []
                 obs_tmp = env.reset()
+                # 當場景創建時，場內角色會死亡，因此必須先將其復活
                 env.check_is_player_dead()
                 obs_tmp = obs_tmp.reshape(-1) # 將三維的觀察資料降成一維
                 obs_n.append(obs_tmp)
