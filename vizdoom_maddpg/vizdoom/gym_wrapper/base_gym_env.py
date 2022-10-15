@@ -1,7 +1,6 @@
 import itertools
 from typing import Optional
 import warnings
-from os import system
 
 import gym
 import numpy as np
@@ -62,6 +61,11 @@ class VizdoomEnv(gym.Env):
         self.game = vzd.DoomGame()
         self.game.load_config(level)
         self.game.set_window_visible(False)
+        
+        if(agent_num == 2):
+            self.game.set_ticrate(2 * vzd.DEFAULT_TICRATE)
+        elif(agent_num == 4):
+            self.game.set_ticrate(1.5 * vzd.DEFAULT_TICRATE)
 
         screen_format = self.game.get_screen_format()
         if screen_format != vzd.ScreenFormat.RGB24 and screen_format != vzd.ScreenFormat.GRAY8:
@@ -115,8 +119,16 @@ class VizdoomEnv(gym.Env):
     def step(self, action):
         #assert self.action_space.contains(action), f"{action!r} ({type(action)}) invalid"
         #assert self.state is not None, "Call `reset` before using `step` method."
-        
+
+        '''
+        print('action:')
+        print(action)
+        '''
         env_action = self.__build_env_action(action)
+        '''
+        print('env_action:')
+        print(env_action)
+        '''
         reward = self.game.make_action(env_action, self.frame_skip)
         self.state = self.game.get_state()
         done = self.game.is_episode_finished()
@@ -144,6 +156,8 @@ class VizdoomEnv(gym.Env):
 
             # binary actions offset by number of delta buttons
             env_action[self.num_delta_buttons:] = agent_action
+            # 已取消註解
+
     def __parse_delta_buttons(self, env_action, agent_action):
         if self.num_delta_buttons != 0:
             if self.num_binary_buttons != 0:
@@ -151,15 +165,12 @@ class VizdoomEnv(gym.Env):
 
             # delta buttons have a direct mapping since they're reorganized to be prior to any binary buttons
             env_action[0:self.num_delta_buttons] = agent_action
-            # 被註解起來所以不會動。fuck
 
     def __build_env_action(self, agent_action):
         # encode users action as environment action
         env_action = np.array([0 for _ in range(self.num_delta_buttons + self.num_binary_buttons)], dtype=np.float32)
         self.__parse_delta_buttons(env_action, agent_action)
         self.__parse_binary_buttons(env_action, agent_action)
-        #print(env_action)
-        #system("pause")
         return env_action
 
     def reset(
