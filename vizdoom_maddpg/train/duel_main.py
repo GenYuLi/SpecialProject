@@ -16,20 +16,21 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 創立MADDPG架構的實例
 def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
-    return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
+    return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000,conv=True)
 
 def get_act(action_n, train=True):
     #print(action_n)
     act= 0
     if train:
-        act = np.random.choice(action_n)
+        act = np.random.choice(4,1,p=action_n)
     else:
         for i in range(4):
             if action_n[i]>action_n[act]:
                 act = i
+    #print(act)
     return act
 
-def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, event_act, event_done):
+def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, event_act, event_done,step_size):
     env = gym.make('MaddpgDuel-v0', host=host_arg, agent_num=agent_arg) # host參數為0意指創建本地伺服器端
     # 當場景創建時，場內角色會死亡，因此必須先將其復活
     env.check_is_player_dead()
@@ -39,8 +40,8 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
     info_queue.put(obs_tmp)
     event_obs.set() # 存取首次觀察資料並傳遞後，通知主程序
     
-    for episode in range(0, 10000):
-        for step in range(0, 2000):
+    for episode in range(0, 10001):
+        for step in range(0, step_size):
             event_act.wait() # 等待主程序傳遞動作資料
             new_obs_n, rew_n, done_n, info_n = env.step(action_queue.get())
             event_act.clear() # 重置訊號
@@ -57,7 +58,7 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
             done = info_queue.get() # 取得結束旗標
             event_done.clear()
             
-            if done or step == 1999:
+            if done or step == step_size-1:
                 obs_tmp = env.reset()
                 obs_tmp = obs_tmp.reshape(-1)
                 info_queue.put(obs_tmp)
@@ -68,11 +69,12 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
             
     
 # 主要訓練函式
-def train(update_size=150,batch_size=300,step_size=2001):
+def train(update_size=256,batch_size=64,step_size=1000):
     
     env = gym.make('MaddpgDuel-v0', host=1) # host參數為1意指加入本地伺服器的客戶端
     # 當場景創建時，場內角色會死亡，因此必須先將其復活
     env.check_is_player_dead()
+    epoch = 0
     
     # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
     obs_shape = []
@@ -89,7 +91,7 @@ def train(update_size=150,batch_size=300,step_size=2001):
         action_shape_n.append(action_n)
         
     maddpg = get_trainers('MaddpgDuel',agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
-    
+    #maddpg.load_model(3000)
     # 初始化章節獎勵
     episode_rewards = [0.0] 
     # 每個Agent之觀察都是list obs_n中的一個元素
@@ -106,6 +108,7 @@ def train(update_size=150,batch_size=300,step_size=2001):
     
     
     for episode in tqdm(range(0, 10001)):
+        env.check_is_player_dead()
         for step in range(0, step_size):
             #print(step)
             env.check_is_player_dead()
@@ -114,8 +117,8 @@ def train(update_size=150,batch_size=300,step_size=2001):
                         for agent, obs in zip(maddpg.agents, obs_n)]
             
             # 取得機率值最大的動作索引值，並轉換為整數資料型態
-            p1_action = get_act(action_n[1])
-            p2_action = get_act(action_n[0])
+            p1_action = get_act(action_n[1],False)
+            p2_action = get_act(action_n[0],False)
             action_queue.put(p1_action)
             event_act.set() # 等待action_n計算完成，再通知子程序
             
@@ -148,10 +151,10 @@ def train(update_size=150,batch_size=300,step_size=2001):
             event_done.set() # 等待存取完畢，再通知子程序
             
             if step % update_size == 0:
+                epoch = epoch + 1
                 # 更新神經網路，目前仍在修正中，尚未完成
                 x = maddpg.memory.sample(batch_size)
                 maddpg.update(x)
-                maddpg.update_all_agents()
                 
             # 檢查章節是否結束
             if done or step == step_size-1:
@@ -171,7 +174,9 @@ def train(update_size=150,batch_size=300,step_size=2001):
                 print(episode_rewards[-1])
                 episode_rewards.append(0.0) # 初始化下一章節的獎勵
                 break
-            
+        
+        if epoch % 10 == 0:
+            maddpg.update_all_agents()
         # 每隔100章節儲存一次訓練模型
         if episode % 1000 == 0:
             maddpg.save_model(episode)
@@ -192,9 +197,9 @@ if __name__ == '__main__':
     event_obs = Event() # 初始化時訊號為False
     event_act = Event()
     event_done = Event()
-    
-    player1_proc = Process(target=player1, args=(host_arg, agent_num, info_queue, action_queue, lock, event_obs, event_act, event_done))
+    step_size = 1000
+    player1_proc = Process(target=player1, args=(host_arg, agent_num, info_queue, action_queue, lock, event_obs, event_act, event_done,step_size))
     player1_proc.start()
-    train()
+    train(step_size)
     player1_proc.join()
     #play()

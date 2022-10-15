@@ -9,7 +9,7 @@ import os
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# Actor被设定为一个三层全连接神经网络，输出为(-1,1)
+# Actor被設定為三層全連結神經網路或捲積層神經網路，輸出為(-1,1)
 class Actor(nn.Module):
 
     def __init__(self, state_dim, action_dim, n_hidden_1, n_hidden_2, conv=True):
@@ -55,7 +55,7 @@ class Actor(nn.Module):
         return x
 
 
-# Critic被设定为一个三层全连接神经网络，输出为一个linear值(这里不使用tanh函数是因为原始的奖励没有取值范围的限制)
+# Critic設定為三層全連結神經網路，輸出為一個linear值(這裡不使用tanh函數是因為原始的獎勵沒有取值範圍的限制)
 class Critic(nn.Module):
 
     def __init__(self, state_dim, action_dim, n_hidden_1, n_hidden_2):
@@ -87,7 +87,7 @@ def soft_update(net_target, net, tau):
 class DDPGAgent(object):
 
     def __init__(self, index, memory_size, batch_size, gamma, state_global, action_global, local=False, conv=False):
-        self.hidden1 = 256
+        self.hidden1 = 512
         self.hidden2 = 256
         self.memory = Memory(memory_size)
         self.state_dim = state_global[index]
@@ -132,7 +132,7 @@ class DDPGAgent(object):
     def act_prob(self, s):
         s = torch.flatten(s, 0, -1)
         a = self.Actor(s)
-        noise = torch.normal(mean=0.0, std=torch.Tensor(size=([len(a)])).fill_(0.1)).to(device)
+        noise = torch.normal(mean=0.0, std=torch.Tensor(size=([len(a)])).fill_(0.60)).to(device)
         a_noise = a + noise
         return a_noise
 

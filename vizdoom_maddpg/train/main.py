@@ -17,21 +17,23 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 創立MADDPG架構的實例
 def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
-    return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
+    return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000, conv=True)
 
 def get_act(action_n, train=True):
     act= 0
+    #print(action_n)
     if train:
-        act = np.random.choice(action_n)
+        act = np.random.choice(4,1,p=action_n)
     else:
         for i in range(4):
             if action_n[i]>action_n[act]:
                 act = i
+    #print(act)
     return act
     
 # 主要訓練函式
 # batch size <= 1600
-def train(update_size=100,batch_size=150,step_size=500):
+def train(update_size=150,batch_size=50,step_size=501):
     # host參數為-1(預設)意指執行單人模式場景(只有一個Agent)
     env = gym.make('VizdoomBasic-v0', host=-1)
     
@@ -52,7 +54,7 @@ def train(update_size=100,batch_size=150,step_size=500):
     action_shape_n.append(4)
     # 創立MADDPG架構的實例
     maddpg = get_trainers('MaddpgSolo',agent_num, obs_shape_n, action_shape_n)
-    #maddpg.load_model(9000)
+    maddpg.load_model(10000)
     # 初始化章節獎勵
     episode_rewards = [0.0]
     # 每個Agent之觀察都是list obs_n中的一個元素
@@ -79,7 +81,7 @@ def train(update_size=100,batch_size=150,step_size=500):
                         for agent, obs in zip(maddpg.agents, obs_n)]
             # 取得機率值最大的動作索引值，並轉換為整數資料型態       
             #print(action_n)    
-            act= get_act(action_n[0],True)
+            act= get_act(action_n[0],False)
             #action = int(np.argmax(action_n[0]))
             # 返回的觀察資訊、獎勵、結束訊號、除錯資訊皆為list型態
             # 每個Agent為list中的一個元素
@@ -107,7 +109,6 @@ def train(update_size=100,batch_size=150,step_size=500):
                 # 更新神經網路，目前仍在修正中，尚未完成
                 maddpg.update(maddpg.memory.sample(batch_size))
                 epoch=epoch+1
-                maddpg.update_all_agents()
             # 檢查章節是否結束
             if done or step == step_size-1:
                 # 每個Agent之觀察都是list obs_n中的一個元素
@@ -124,6 +125,8 @@ def train(update_size=100,batch_size=150,step_size=500):
                 episode_rewards.append(0.0)
                 break
         # 每隔100章節儲存一次訓練模型
+        if episode % 10 == 0:
+            maddpg.update_all_agents()
         if episode % 1000 == 0 and episode != 0:
             maddpg.save_model(episode)
 
@@ -150,7 +153,7 @@ def play():
     action_shape_n.append(4)
     # 創立MADDPG架構的實例
     maddpg = get_trainers('MaddpgSolo',agent_num, obs_shape_n, action_shape_n)
-    maddpg.load_model(10000)
+    maddpg.load_model(9900)
     # 初始化章節獎勵
     episode_rewards = [0.0]
     # 每個Agent之觀察都是list obs_n中的一個元素
