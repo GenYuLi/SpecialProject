@@ -61,6 +61,7 @@ class VizdoomEnv(gym.Env):
         # init game
         self.game = vzd.DoomGame()
         self.game.load_config(level)
+        self.game.set_ticrate(2 * vzd.DEFAULT_TICRATE)
         self.game.set_window_visible(False)
 
         screen_format = self.game.get_screen_format()
