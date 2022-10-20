@@ -27,7 +27,6 @@ def player(host_arg, agent_arg, player_queue, lock, event_obs, event_act, event_
         for step in range(0, 2000):
             # 當場景創建時，場內角色會死亡，因此必須先將其復活
             env.check_is_player_dead()
-            
             event_act.wait() # 等待主程序傳遞動作資料
             new_obs_n, rew_n, done_n, info_n = env.step(player_queue.get())
             event_act.clear() # 重置訊號

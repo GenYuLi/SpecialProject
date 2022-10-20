@@ -67,9 +67,21 @@ register(
 )
 
 register(
+    id="MaddpgSingle-v0",
+    entry_point="vizdoom.gym_wrapper.gym_env_defns:VizdoomScenarioEnv",
+    kwargs={"scenario_file": "maddpg_single.cfg"}
+)
+
+register(
     id="MaddpgDuel-v0",
     entry_point="vizdoom.gym_wrapper.gym_env_defns:VizdoomScenarioEnv",
     kwargs={"scenario_file": "maddpg_duel.cfg"}
+)
+
+register(
+    id="MaddpgDuelFist-v0",
+    entry_point="vizdoom.gym_wrapper.gym_env_defns:VizdoomScenarioEnv",
+    kwargs={"scenario_file": "maddpg_duel_fist.cfg"}
 )
 
 register(
