@@ -3,7 +3,7 @@
 3. maddpg_single
   (1) Gym scenario：MaddpgSingle-v0
   (2) 武器：手槍
-  (3) 動作數量：16
+  (3) 動作數量：8
   (4) 結束條件：Episode time out
   (5) Max steps:4000
   (6) 附註：怪物隨機生成、有補血藥
