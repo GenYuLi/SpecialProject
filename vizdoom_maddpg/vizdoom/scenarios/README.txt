@@ -2,10 +2,10 @@
 2. wad檔案需要透過SLADE 3或其他專用軟體編輯，若直接更改檔名、使用Notepad編輯皆可能造成錯誤。
 3. maddpg_single
   (1) Gym scenario：MaddpgSingle-v0
-  (2) 武器：手槍
+  (2) 武器：Chaingun
   (3) 動作數量：8
   (4) 結束條件：Episode time out
-  (5) Max steps:4000
+  (5) Max steps:10000
   (6) 附註：怪物隨機生成、有補血藥
 4. maddpg_duel
   (1) Gym scenario：MaddpgDuel-v0
