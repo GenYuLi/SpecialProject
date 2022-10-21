@@ -1,3 +1,4 @@
+from ctypes import util
 from email.errors import ObsoleteHeaderDefect
 from operator import truediv
 import torch
@@ -5,6 +6,7 @@ from torch import nn
 from memory import Memory
 import torch.nn.functional as F
 import os
+import utils
 
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -14,21 +16,27 @@ class Actor(nn.Module):
 
     def __init__(self, state_dim, action_dim, n_hidden_1, n_hidden_2, conv=True):
         super(Actor, self).__init__()
-        self.conv1 = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=10, kernel_size=5), nn.ReLU(True))
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.conv2 = nn.Sequential(nn.Conv2d(in_channels=10, out_channels=30,kernel_size=5), nn.ReLU(True))
-        #print('state_dim: ',state_dim)
-        state_dim_0 = (((state_dim[0]-4)/2-4)/2)
-        state_dim_1 = (((state_dim[1]-4)/2-4)/2)
-        state_dim_0 = int(state_dim_0)
-        state_dim_1 = int(state_dim_1)
-        self.fc1 = nn.Sequential(nn.Linear(state_dim_0*state_dim_1*30, n_hidden_1), nn.ReLU(True))
-        self.fc2 = nn.Sequential(nn.Linear(n_hidden_1, n_hidden_2), nn.ReLU(True))
-        self.fc3 = nn.Sequential(nn.Linear(n_hidden_2, action_dim), nn.Tanh())
-        self.layer1 = nn.Sequential(nn.Linear(state_dim[0]*state_dim[1]*state_dim[2], n_hidden_1), nn.ReLU(True))
-        self.layer2 = nn.Sequential(nn.Linear(n_hidden_1, n_hidden_2), nn.ReLU(True))
-        self.layer3 = nn.Sequential(nn.Linear(n_hidden_2, action_dim), nn.Tanh())
+        if conv:
+            self.conv1 = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=16, kernel_size=5), nn.BatchNorm2d(16), nn.ReLU(True))
+            self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.conv2 = nn.Sequential(nn.Conv2d(in_channels=16, out_channels=32,kernel_size=5), nn.BatchNorm2d(32), nn.ReLU(True))
+            self.conv3 = nn.Sequential(nn.Conv2d(in_channels=32, out_channels=64,kernel_size=5), nn.BatchNorm2d(64), nn.ReLU(True))
+            #print('state_dim: ',state_dim)
+            state_dim_0 = (((((state_dim[0]-4)/2-4)/2)-4)/2)
+            state_dim_1 = (((((state_dim[1]-4)/2-4)/2)-4)/2)
+            state_dim_0 = int(state_dim_0)
+            state_dim_1 = int(state_dim_1)
+            #print(state_dim_0)
+            #os.system("pause")
+            self.fc1 = nn.Sequential(nn.Linear(state_dim_0*state_dim_1*64, n_hidden_1), nn.ReLU(True))
+            self.fc2 = nn.Sequential(nn.Linear(n_hidden_1, n_hidden_2), nn.ReLU(True))
+            self.fc3 = nn.Sequential(nn.Linear(n_hidden_2, action_dim), nn.Tanh())
+        else:
+            self.layer1 = nn.Sequential(nn.Linear(state_dim[0]*state_dim[1]*state_dim[2], n_hidden_1), nn.ReLU(True))
+            self.layer2 = nn.Sequential(nn.Linear(n_hidden_1, n_hidden_2), nn.ReLU(True))
+            self.layer3 = nn.Sequential(nn.Linear(n_hidden_2, action_dim), nn.Tanh())
         self.conv = conv
+        utils.weight_init(self)
 
     def forward(self, x):
         # 檢查輸入資料之形狀
@@ -39,8 +47,10 @@ class Actor(nn.Module):
             #os.system("pause")
             x = self.pool(self.conv1(x))
             x = self.pool(self.conv2(x))
+            x = self.pool(self.conv3(x))
             x = torch.flatten(x,1)
-            #print('x=',x)
+            #print('x.shape: ', x.shape)
+            #os.system("pause")
             x = self.fc1(x)
             x = self.fc2(x)
             x = self.fc3(x)
@@ -132,7 +142,7 @@ class DDPGAgent(object):
     def act_prob(self, s):
         s = torch.flatten(s, 0, -1)
         a = self.Actor(s)
-        noise = torch.normal(mean=0.0, std=torch.Tensor(size=([len(a)])).fill_(0.60)).to(device)
+        noise = torch.normal(mean=0.0, std=torch.Tensor(size=([len(a)])).fill_(0.50)).to(device)
         a_noise = a + noise
         return a_noise
 
@@ -231,7 +241,13 @@ class MADDPG(object):
             if i == index:
                 all_pol_acs.append(curr_pol_vf_in)
             else:
-                all_pol_acs.append(self.agents[i].Actor(observations[:, i]).detach())
+                if self.conv:
+                    for __ in range(observations.shape[0]):
+                    # 根據局部觀測值輸出目標動作網路的決策 action
+                        action = self.agents[i].Actor(observations[__, i])
+                        all_pol_acs.append(action)
+                else:
+                    all_pol_acs.append(self.agents[i].Actor(observations[:, i]).detach())
         vf_in = torch.cat((observations,
                            torch.cat(all_pol_acs, dim=0).to(device).reshape(actions.size()[0], actions.size()[1],
                                                                             actions.size()[2])), dim=2)

@@ -19,13 +19,14 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
     return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000, conv=True)
 
-def get_act(action_n, train=True):
+def get_act(action_n, train=False):
     act= 0
     #print(action_n)
     if train:
-        act = np.random.choice(4,1,p=action_n)
+        act = np.random.choice(8,1,p=action_n)
     else:
-        for i in range(4):
+        for i in range(8):
+    #    for i in range(4):
             if action_n[i]>action_n[act]:
                 act = i
     #print(act)
@@ -33,9 +34,11 @@ def get_act(action_n, train=True):
     
 # 主要訓練函式
 # batch size <= 1600
-def train(update_size=150,batch_size=50,step_size=501):
+def train(update_size=150,batch_size=50,step_size=4000):
     # host參數為-1(預設)意指執行單人模式場景(只有一個Agent)
-    env = gym.make('VizdoomBasic-v0', host=-1)
+    #env_name='VizdoomBasic-v0'
+    env_name='MaddpgSingle-v0'
+    env = gym.make(env_name, host=-1)
     
     # 可透過類別縮放訓練影像像素，但需要額外的修改
     #env = ObservationWrapper(env)
@@ -51,10 +54,12 @@ def train(update_size=150,batch_size=50,step_size=501):
     # 設定Agents動作空間的形狀
     action_shape_n = []
     # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(4)
-    action_shape_n.append(4)
+    #print(env.action_space)
+    #action_shape_n.append(4)
+    action_shape_n.append(8)
     # 創立MADDPG架構的實例
-    maddpg = get_trainers('MaddpgSolo',agent_num, obs_shape_n, action_shape_n)
-    maddpg.load_model(10000)
+    maddpg = get_trainers(env_name,agent_num, obs_shape_n, action_shape_n)
+    #maddpg.load_model(12000)
     # 初始化章節獎勵
     episode_rewards = [0.0]
     # 每個Agent之觀察都是list obs_n中的一個元素
@@ -133,12 +138,12 @@ def train(update_size=150,batch_size=50,step_size=501):
 # 以訓練完成的模型執行程式，暫未處理
 
 def play():
-    env = gym.make('VizdoomBasic-v0', host=-1)
+    #env_name='VizdoomBasic-v0'
+    env_name='MaddpgSingle-v0'
+    env = gym.make(env_name, host=-1)
     
     # 可透過類別縮放訓練影像像素，但需要額外的修改
     #env = ObservationWrapper(env)
-    
-    
     # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
     obs_shape_n = []
     obs_shape =[]
@@ -150,10 +155,10 @@ def play():
     # 設定Agents動作空間的形狀
     action_shape_n = []
     # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(4)
-    action_shape_n.append(4)
+    action_shape_n.append(8)
     # 創立MADDPG架構的實例
-    maddpg = get_trainers('MaddpgSolo',agent_num, obs_shape_n, action_shape_n)
-    maddpg.load_model(9900)
+    maddpg = get_trainers(env_name,agent_num, obs_shape_n, action_shape_n)
+    maddpg.load_model(12000)
     # 初始化章節獎勵
     episode_rewards = [0.0]
     # 每個Agent之觀察都是list obs_n中的一個元素
@@ -178,7 +183,7 @@ def play():
             # 每個Agent為list中的一個元素
             # obs: observation, rew: reward, done: end signal, info: debug info.
             #print(action_n)
-            act= get_act(action_n,False)
+            act= get_act(action_n[0],False)
             new_obs_n, rew_n, done_n, info_n = env.step(act)
             #print(rew_n)
             #time.sleep(0.015)

@@ -16,7 +16,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # 創立MADDPG架構的實例
 def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
-    return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000,conv=False)
+    return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000,conv=True)
 
 def get_act(action_n, train=True):
     #print(action_n)
@@ -92,7 +92,7 @@ def train(update_size=256,batch_size=64,step_size=1200):
         action_shape_n.append(action_n)
         
     maddpg = get_trainers('MaddpgDuel',agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
-    maddpg.load_model(3000)
+    #maddpg.load_model(3000)
     # 初始化章節獎勵
     episode_rewards = [0.0] 
     # 每個Agent之觀察都是list obs_n中的一個元素
