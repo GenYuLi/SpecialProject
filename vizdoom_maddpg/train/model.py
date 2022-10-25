@@ -1,31 +1,71 @@
+from ctypes import util
+from email.errors import ObsoleteHeaderDefect
+from operator import truediv
 import torch
 from torch import nn
 from memory import Memory
+import torch.nn.functional as F
 import os
+import utils
 
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-# Actor被设定为一个三层全连接神经网络，输出为(-1,1)
+# Actor被設定為三層全連結神經網路或捲積層神經網路，輸出為(-1,1)
 class Actor(nn.Module):
 
-    def __init__(self, state_dim, action_dim, n_hidden_1, n_hidden_2):
+    def __init__(self, state_dim, action_dim, n_hidden_1, n_hidden_2, conv=True):
         super(Actor, self).__init__()
-        self.layer1 = nn.Sequential(nn.Linear(state_dim, n_hidden_1), nn.ReLU(True))
-        self.layer2 = nn.Sequential(nn.Linear(n_hidden_1, n_hidden_2), nn.ReLU(True))
-        self.layer3 = nn.Sequential(nn.Linear(n_hidden_2, action_dim), nn.Tanh())
+        if conv:
+            self.conv1 = nn.Sequential(nn.Conv2d(in_channels=3, out_channels=16, kernel_size=5), nn.BatchNorm2d(16), nn.ReLU(True))
+            self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+            self.conv2 = nn.Sequential(nn.Conv2d(in_channels=16, out_channels=32,kernel_size=5), nn.BatchNorm2d(32), nn.ReLU(True))
+            self.conv3 = nn.Sequential(nn.Conv2d(in_channels=32, out_channels=64,kernel_size=5), nn.BatchNorm2d(64), nn.ReLU(True))
+            #print('state_dim: ',state_dim)
+            state_dim_0 = (((((state_dim[0]-4)/2-4)/2)-4)/2)
+            state_dim_1 = (((((state_dim[1]-4)/2-4)/2)-4)/2)
+            state_dim_0 = int(state_dim_0)
+            state_dim_1 = int(state_dim_1)
+            #print(state_dim_0)
+            #os.system("pause")
+            self.fc1 = nn.Sequential(nn.Linear(state_dim_0*state_dim_1*64, n_hidden_1), nn.ReLU(True))
+            self.fc2 = nn.Sequential(nn.Linear(n_hidden_1, n_hidden_2), nn.ReLU(True))
+            self.fc3 = nn.Sequential(nn.Linear(n_hidden_2, action_dim), nn.Tanh())
+        else:
+            self.layer1 = nn.Sequential(nn.Linear(state_dim[0]*state_dim[1]*state_dim[2], n_hidden_1), nn.ReLU(True))
+            self.layer2 = nn.Sequential(nn.Linear(n_hidden_1, n_hidden_2), nn.ReLU(True))
+            self.layer3 = nn.Sequential(nn.Linear(n_hidden_2, action_dim), nn.Tanh())
+        self.conv = conv
+        utils.weight_init(self)
 
     def forward(self, x):
-        # 除錯用(檢查輸入資料之形狀) 
-        #print('x.shape:')
-        #print(x.shape)
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
+        # 檢查輸入資料之形狀
+        #print('x.shape:', x.shape)
+        if self.conv:
+            x = torch.reshape(x, (1, 3, 120, 160))
+            #print('x.shape: ', x.shape)
+            #os.system("pause")
+            x = self.pool(self.conv1(x))
+            x = self.pool(self.conv2(x))
+            x = self.pool(self.conv3(x))
+            x = torch.flatten(x,1)
+            #print('x.shape: ', x.shape)
+            #os.system("pause")
+            x = self.fc1(x)
+            x = self.fc2(x)
+            x = self.fc3(x)
+        else:
+            x = self.layer1(x)
+            x = self.layer2(x)
+            x = self.layer3(x)
+        #print('x.shape: ', x.shape)
+        x = x.reshape(-1)
+        #print('x:',x)
+        #os.system("pause")
         return x
 
 
-# Critic被设定为一个三层全连接神经网络，输出为一个linear值(这里不使用tanh函数是因为原始的奖励没有取值范围的限制)
+# Critic設定為三層全連結神經網路，輸出為一個linear值(這裡不使用tanh函數是因為原始的獎勵沒有取值範圍的限制)
 class Critic(nn.Module):
 
     def __init__(self, state_dim, action_dim, n_hidden_1, n_hidden_2):
@@ -43,12 +83,12 @@ class Critic(nn.Module):
         return x
 
 
-# 梯度下降参数
+# 梯度下降參數
 LR_C = 1e-3
 LR_A = 1e-3
 
 
-# 在DDPG中，训练网络的参数不是直接复制给目标网络的，而是一个软更新的过程，也就是 v_new = (1-tau) * v_old + tau * v_new
+# 在DDPG中，訓練網路的參數不是直接複製給目標網路的，而是軟更新的過程，也就是 v_new = (1-tau) * v_old + tau * v_new
 def soft_update(net_target, net, tau):
     for target_param, param in zip(net_target.parameters(), net.parameters()):
         target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
@@ -56,32 +96,42 @@ def soft_update(net_target, net, tau):
 
 class DDPGAgent(object):
 
-    def __init__(self, index, memory_size, batch_size, gamma, state_global, action_global, local=False):
-        self.hidden = 200
+    def __init__(self, index, memory_size, batch_size, gamma, state_global, action_global, local=False, conv=False):
+        self.hidden1 = 512
+        self.hidden2 = 256
         self.memory = Memory(memory_size)
         self.state_dim = state_global[index]
         self.action_dim = action_global[index]
-        self.Actor = Actor(self.state_dim, self.action_dim, self.hidden, self.hidden).to(device)
-        # local决定是用局部信息还是全局信息，也决定是DDPG算法还是MADDPG算法
+        self.Actor = Actor(self.state_dim, self.action_dim, self.hidden1, self.hidden2, conv=conv).to(device)
+        # local determine one agent's information or all the agents' information, that is to say
+        # it determines DDPG or MADDPG algorithm.
         if not local:
             #MADDPG
-            self.Critic = Critic(sum(state_global), sum(action_global), self.hidden, self.hidden).to(device)
+            sum_state_global=0
+            for st in state_global:
+                sum_state_global = sum_state_global + st[0]*st[1]*st[2]
+            self.Critic = Critic(sum_state_global, sum(action_global), self.hidden1, self.hidden2).to(device)
+            #self.Critic = Critic(sum(state_global), sum(action_global), self.hidden1, self.hidden2).to(device)
         else:
             #DDPG
-            self.Critic = Critic(self.state_dim, self.action_dim, self.hidden, self.hidden).to(device)
-        self.Actor_target = Actor(self.state_dim, self.action_dim, self.hidden, self.hidden).to(device)
+            self.Critic = Critic(self.state_dim, self.action_dim, self.hidden1, self.hidden2).to(device)
+        self.Actor_target = Actor(self.state_dim, self.action_dim, self.hidden1, self.hidden2, conv=conv).to(device)
         if not local:
             #MADDPG
-            self.Critic_target = Critic(sum(state_global), sum(action_global), self.hidden, self.hidden).to(device)
+            sum_state_global=0
+            for st in state_global:
+                sum_state_global = sum_state_global + st[0]*st[1]*st[2]
+            self.Critic_target = Critic(sum_state_global, sum(action_global), self.hidden1, self.hidden2).to(device)
+            #self.Critic_target = Critic(sum(state_global), sum(action_global), self.hidden1, self.hidden2).to(device)
         else:
             #DDPG
-            self.Critic_target = Critic(self.state_dim, self.action_dim, self.hidden, self.hidden).to(device)
+            self.Critic_target = Critic(self.state_dim, self.action_dim, self.hidden1, self.hidden2).to(device)
         self.critic_train = torch.optim.Adam(self.Critic.parameters(), lr=LR_C)
         self.actor_train = torch.optim.Adam(self.Actor.parameters(), lr=LR_A)
         self.loss_td = nn.MSELoss().to(device)
         self.batch_size = batch_size
         self.gamma = gamma
-        self.tau = 0.25
+        self.tau = 0.5
         self.local = local
 
     # 輸出確切的Agent動作
@@ -92,22 +142,23 @@ class DDPGAgent(object):
     def act_prob(self, s):
         s = torch.flatten(s, 0, -1)
         a = self.Actor(s)
-        noise = torch.normal(mean=0.0, std=torch.Tensor(size=([len(a)])).fill_(0.02)).to(device)
+        noise = torch.normal(mean=0.0, std=torch.Tensor(size=([len(a)])).fill_(0.50)).to(device)
         a_noise = a + noise
         return a_noise
 
 
 class MADDPG(object):
-    def __init__(self,model_name, n, state_global, action_global, gamma, memory_size):
+    def __init__(self,model_name, n, state_global, action_global, gamma, memory_size, conv=True):
         self.n = n
         self.gamma = gamma
         self.memory = Memory(memory_size)
         # 由於訓練資料大，故將Batch size設定為1
         #self.agents = [DDPGAgent(index, 1600, 1, 0.5, state_global, action_global) for index in range(0, n)]
         # alought change the batch size here, but the batch size of the epoch is determined in main.py
-        self.agents = [DDPGAgent(index, 1600, 400, 0.5, state_global, action_global) for index in range(0, n)]
+        self.agents = [DDPGAgent(index, 1600, 400, 0.5, state_global, action_global, conv=conv) for index in range(0, n)]
         self.model_name=model_name
         self.model_count=0
+        self.conv=conv
 
     
     def update_agent(self, sample, index):
@@ -125,25 +176,44 @@ class MADDPG(object):
             print('next_obs:')
             print(next_obs)
         '''
-        
+        ## if conv version, then input one photo once.
         curr_agent = self.agents[index]
         curr_agent.critic_train.zero_grad()
         all_target_actions = []
-        # 根据局部观测值输出动作目标网络的动作
-        for i in range(0, self.n):
-            action = curr_agent.Actor_target(next_obs[:, i])
-            all_target_actions.append(action)
+        if self.conv:
+            #print('shape: ',observations.shape[0])
+            for __ in range(observations.shape[0]):
+                # 根據局部觀測值輸出目標動作網路的決策 action
+                for i in range(0, self.n):
+                    #print('next_obs:',next_obs[__, i])
+                    #os.system("pause")
+                    action = curr_agent.Actor_target(next_obs[__, i])
+                    #print(action)
+                    #os.system("pause")
+                    all_target_actions.append(action)
+        else:
+            #print('ob:',observations.shape)
+            # 根據局部觀測值輸出目標動作網路的決策 action
+            for i in range(0, self.n):
+                action = curr_agent.Actor_target(next_obs[:, i])
+                #print(action)
+                #os.system("pause")
+                all_target_actions.append(action)
+        ##
+        #print('all_target_actions:',all_target_actions)
         action_target_all = torch.cat(all_target_actions, dim=0).to(device).reshape(actions.size()[0], actions.size()[1],
                                                                        actions.size()[2])
         target_vf_in = torch.cat((next_obs, action_target_all), dim=2)
         del action_target_all
-        # 计算在目标网络下，基于贝尔曼方程得到当前情况的评价
+        # calculate the value of the value of the state which the target network have.
+        # 計算在目標網路下,基於Bellman Equation得到當前情況的評價
         target_value = rewards[:, index] + self.gamma * curr_agent.Critic_target(target_vf_in).squeeze(dim=1)
         del target_vf_in
         vf_in = torch.cat((observations, actions), dim=2)
         actual_value = curr_agent.Critic(vf_in).squeeze(dim=1)
         del vf_in
-        # 计算针对Critic的损失函数
+        # calculate the loss function to the curr_agnet.
+        # 計算針對Critic的損失函數
         vf_loss = curr_agent.loss_td(actual_value, target_value.detach())
         del target_value
         del actual_value
@@ -153,18 +223,35 @@ class MADDPG(object):
         curr_agent.critic_train.step()
 
         curr_agent.actor_train.zero_grad()
-        curr_pol_out = curr_agent.Actor(observations[:, index])
+        ##edit here.
+        if self.conv:
+            for __ in range(observations.shape[0]):
+                act = curr_agent.Actor_target(next_obs[__, i])
+                if __ == 0:
+                    curr_pol_out = act
+                else:
+                    curr_pol_out = torch.cat((curr_pol_out,act))
+        else:
+            curr_pol_out=(curr_agent.Actor(observations[:, index]))
+        #print('curr_pol_out: ',curr_pol_out)
+        #os.system("pause")
         curr_pol_vf_in = curr_pol_out
         all_pol_acs = []
         for i in range(0, self.n):
             if i == index:
                 all_pol_acs.append(curr_pol_vf_in)
             else:
-                all_pol_acs.append(self.agents[i].Actor(observations[:, i]).detach())
+                if self.conv:
+                    for __ in range(observations.shape[0]):
+                    # 根據局部觀測值輸出目標動作網路的決策 action
+                        action = self.agents[i].Actor(observations[__, i])
+                        all_pol_acs.append(action)
+                else:
+                    all_pol_acs.append(self.agents[i].Actor(observations[:, i]).detach())
         vf_in = torch.cat((observations,
                            torch.cat(all_pol_acs, dim=0).to(device).reshape(actions.size()[0], actions.size()[1],
                                                                             actions.size()[2])), dim=2)
-        # DDPG中针对Actor的损失函数
+        # DDPG中針對Actor的損失函數
         pol_loss = -torch.mean(curr_agent.Critic(vf_in))
         pol_loss.backward()
         curr_agent.actor_train.step()
@@ -184,18 +271,34 @@ class MADDPG(object):
         self.memory.add(s, a, r, s_, done)
 
     def save_model(self, episode):
-        for i in range(0, self.n):
-            model_name_c = self.model_name+"_Critic_Agent" + str(i) + "_" + str(episode+self.model_count) + ".pt"
-            model_name_a = self.model_name+"_Actor_Agent" + str(i) + "_" + str(episode+self.model_count) + ".pt"
-            torch.save(self.agents[i].Critic_target, 'model_tag/' + model_name_c)
-            torch.save(self.agents[i].Actor_target, 'model_tag/' + model_name_a)
+        if self.conv:
+            for i in range(0, self.n):
+                model_name_c = self.model_name+"_CNN_Critic_Agent" + str(i) + "_" + str(episode+self.model_count) + ".pt"
+                model_name_a = self.model_name+"_CNN_Actor_Agent" + str(i) + "_" + str(episode+self.model_count) + ".pt"
+                torch.save(self.agents[i].Critic_target, 'model_tag/' + model_name_c)
+                torch.save(self.agents[i].Actor_target, 'model_tag/' + model_name_a)
+        else:
+            for i in range(0, self.n):
+                model_name_c = self.model_name+"_Critic_Agent" + str(i) + "_" + str(episode+self.model_count) + ".pt"
+                model_name_a = self.model_name+"_Actor_Agent" + str(i) + "_" + str(episode+self.model_count) + ".pt"
+                torch.save(self.agents[i].Critic_target, 'model_tag/' + model_name_c)
+                torch.save(self.agents[i].Actor_target, 'model_tag/' + model_name_a)
 
     def load_model(self, episode):
         self.model_count=episode
-        for i in range(0, self.n):
-            model_name_c = self.model_name+"_Critic_Agent" + str(i) + "_" + str(episode) + ".pt"
-            model_name_a = self.model_name+"_Actor_Agent" + str(i) + "_" + str(episode) + ".pt"
-            self.agents[i].Critic_target = torch.load("model_tag/" + model_name_c)
-            self.agents[i].Critic = torch.load("model_tag/" + model_name_c)
-            self.agents[i].Actor_target = torch.load("model_tag/" + model_name_a)
-            self.agents[i].Actor = torch.load("model_tag/" + model_name_a)
+        if self.conv:
+            for i in range(0, self.n):
+                model_name_c = self.model_name+"_CNN_Critic_Agent" + str(i) + "_" + str(episode) + ".pt"
+                model_name_a = self.model_name+"_CNN_Actor_Agent" + str(i) + "_" + str(episode) + ".pt"
+                self.agents[i].Critic_target = torch.load("model_tag/" + model_name_c)
+                self.agents[i].Critic = torch.load("model_tag/" + model_name_c)
+                self.agents[i].Actor_target = torch.load("model_tag/" + model_name_a)
+                self.agents[i].Actor = torch.load("model_tag/" + model_name_a)
+        else:
+            for i in range(0, self.n):
+                model_name_c = self.model_name+"_Critic_Agent" + str(i) + "_" + str(episode) + ".pt"
+                model_name_a = self.model_name+"_Actor_Agent" + str(i) + "_" + str(episode) + ".pt"
+                self.agents[i].Critic_target = torch.load("model_tag/" + model_name_c)
+                self.agents[i].Critic = torch.load("model_tag/" + model_name_c)
+                self.agents[i].Actor_target = torch.load("model_tag/" + model_name_a)
+                self.agents[i].Actor = torch.load("model_tag/" + model_name_a)
