@@ -16,9 +16,9 @@
 5. maddpg_duel_fist
   (1) Gym scenario：MaddpgDuelFist-v0
   (2) 武器：手槍
-  (3) 動作數量：4
-  (4) 結束條件：episode time out
-  (5) Max steps:1200
+  (3) 動作數量：8
+  (4) 結束條件：Episode time out
+  (5) Max steps:2000
 6. maddpg_quad
   (1) Gym scenario：MaddpgQuad-v0
   (2) 武器：手槍
