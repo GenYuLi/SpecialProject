@@ -11,13 +11,14 @@ from torch.multiprocessing import Process, Manager, Event, Queue
 
 # 優先使用GPU資源作運算
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+env_name='MaddpgQuad-v0'
 
 # 創立MADDPG架構的實例
 def get_trainers(modelname,agent_num, obs_shape_n, action_shape_n):
     return MADDPG(modelname,agent_num, obs_shape_n, action_shape_n, 0.7, 20000)
 
 def player(host_arg, agent_arg, player_queue, lock, event_obs, event_act, event_done):
-    env = gym.make('MaddpgQuad-v0', host=host_arg, agent_num=agent_arg) # host參數為0意指創建本地伺服器端
+    env = gym.make(env_name, host=host_arg, agent_num=agent_arg) # host參數為0意指創建本地伺服器端
     obs_tmp = env.reset()
     obs_tmp = obs_tmp.reshape(-1)
     player_queue.put(obs_tmp)
@@ -58,7 +59,7 @@ def player(host_arg, agent_arg, player_queue, lock, event_obs, event_act, event_
     
 # 主要訓練函式
 def train():
-    env = gym.make('MaddpgQuad-v0', host=3) # host參數不為0意指加入本地伺服器的客戶端
+    env = gym.make(env_name, host=3) # host參數不為0意指加入本地伺服器的客戶端
     
     obs_shape = 120*160*3 # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
     obs_shape_n = []  # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
@@ -68,7 +69,7 @@ def train():
         obs_shape_n.append(obs_shape)
         action_shape_n.append(action_n)
         
-    maddpg = get_trainers('MaddpgQuad',agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
+    maddpg = get_trainers(env_name,agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
     # 初始化章節獎勵
     episode_rewards = [0.0] 
     # 每個Agent之觀察都是list obs_n中的一個元素
