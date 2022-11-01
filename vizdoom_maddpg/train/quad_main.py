@@ -24,9 +24,10 @@ def player(host_arg, agent_arg, player_queue, lock, event_obs, event_act, event_
     event_obs.set() # 存取首次觀察資料並傳遞後，通知主程序
     
     for episode in range(0, 10000):
+        # 當場景創建時，場內角色會死亡，因此必須先將其復活
+        env.check_is_player_dead()
+        time.sleep(1)
         for step in range(0, 2000):
-            # 當場景創建時，場內角色會死亡，因此必須先將其復活
-            env.check_is_player_dead()
             event_act.wait() # 等待主程序傳遞動作資料
             new_obs_n, rew_n, done_n, info_n = env.step(player_queue.get())
             event_act.clear() # 重置訊號
@@ -47,6 +48,7 @@ def player(host_arg, agent_arg, player_queue, lock, event_obs, event_act, event_
                 obs_tmp = env.reset()
                 # 當場景創建時，場內角色會死亡，因此必須先將其復活
                 env.check_is_player_dead()
+                time.sleep(1)
                 obs_tmp = obs_tmp.reshape(-1)
                 player_queue.put(obs_tmp)
                 event_obs.set() # 存取觀察資料並傳遞後，通知主程序
@@ -88,11 +90,11 @@ def train():
     
     
     for episode in range(0, 10000):
+        # 當場景創建時，場內角色會死亡，因此必須先將其復活
+        env.check_is_player_dead()
+        time.sleep(1)
         for step in range(0, 2000):
-            # 當場景創建時，場內角色會死亡，因此必須先將其復活
-            env.check_is_player_dead()
-            
-            print(step)
+            #print(step)
             # 以機率形式輸出Agents的動作
             action_n = [agent.act_prob(torch.from_numpy(obs.astype(np.float32)).to(device)).detach().cpu().numpy()
                         for agent, obs in zip(maddpg.agents, obs_n)]
@@ -130,7 +132,6 @@ def train():
             for player_no in range(1, agent_num):
                 event_obs_list[player_no].clear()
             
-            
             # 將資訊紀錄於MADDPG結構的記憶體
             maddpg.add_data(obs_n, action_n, rew_n, new_obs_list, done_n)
             # 將所有Agents的章節獎勵加總
@@ -160,6 +161,7 @@ def train():
                 obs_tmp = env.reset()
                 # 當場景創建時，場內角色會死亡，因此必須先將其復活
                 env.check_is_player_dead()
+                time.sleep(1)
                 obs_tmp = obs_tmp.reshape(-1) # 將三維的觀察資料降成一維
                 obs_n.append(obs_tmp)
                 
