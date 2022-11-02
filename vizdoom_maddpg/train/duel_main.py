@@ -75,7 +75,7 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
     
 # 主要訓練函式
 #256 64
-def train(update_size=256,batch_size=64,step_size=1200):
+def train(update_size=256,batch_size=64,step_size=2000):
     
     env = gym.make(env_name, host=1) # host參數為1意指加入本地伺服器的客戶端
     
@@ -85,14 +85,14 @@ def train(update_size=256,batch_size=64,step_size=1200):
     obs_shape.append(160)
     obs_shape.append(3)
     obs_shape_n = []  # 設定Agents觀察空間的形狀，每個Agents的觀察空間都是list中的一個元素
-    action_n = 4 # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(8)
+    action_n = 8 # 可透過print(env.action_space)得知Agent在此場景的動作空間為Discrete(8)
     action_shape_n = [] # 設定Agents動作空間的形狀
     for i in range(0, agent_num):
         obs_shape_n.append(obs_shape)
         action_shape_n.append(action_n)
         
     maddpg = get_trainers(env_name,agent_num, obs_shape_n, action_shape_n) # 創立MADDPG架構的實例
-    #maddpg.load_model(3000)
+    maddpg.load_model(2000)
     # 初始化章節獎勵
     episode_rewards = [0.0] 
     # 每個Agent之觀察都是list obs_n中的一個元素
@@ -199,9 +199,9 @@ if __name__ == '__main__':
     event_obs = Event() # 初始化時訊號為False
     event_act = Event()
     event_done = Event()
-    step_size = 1000
+    step_size=2000
     player1_proc = Process(target=player1, args=(host_arg, agent_num, info_queue, action_queue, lock, event_obs, event_act, event_done,step_size))
     player1_proc.start()
-    train(step_size)
+    train()
     player1_proc.join()
     #play()
