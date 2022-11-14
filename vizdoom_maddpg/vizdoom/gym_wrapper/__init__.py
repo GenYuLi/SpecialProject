@@ -85,6 +85,12 @@ register(
 )
 
 register(
+    id="MaddpgDuelCoop-v0",
+    entry_point="vizdoom.gym_wrapper.gym_env_defns:VizdoomScenarioEnv",
+    kwargs={"scenario_file": "maddpg_duel_coop.cfg"}
+)
+
+register(
     id="MaddpgQuad-v0",
     entry_point="vizdoom.gym_wrapper.gym_env_defns:VizdoomScenarioEnv",
     kwargs={"scenario_file": "maddpg_quad.cfg"}
