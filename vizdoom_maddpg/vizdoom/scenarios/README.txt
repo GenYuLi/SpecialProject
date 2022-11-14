@@ -25,7 +25,7 @@
   (2) 武器：手槍
   (3) 動作數量：8
   (4) 結束條件：Episode time out
-  (5) Max steps:1200
+  (5) Max steps:2000
   (6) 附註：目標為合作擊殺怪物，誤傷友軍將獲得懲罰
 7. maddpg_quad
   (1) Gym scenario：MaddpgQuad-v0
