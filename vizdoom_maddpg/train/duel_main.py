@@ -2,11 +2,13 @@ import torch
 import time
 import numpy as np
 from tqdm import tqdm
+from random import choice
 import os
 
 from model import DDPGAgent, MADDPG
 
 import gym
+import vizdoom as vzd
 from vizdoom.gym_wrapper.base_gym_env import VizdoomEnv
 from vizdoom import gym_wrapper
 from torch.multiprocessing import Process, Manager, Event, Queue
@@ -70,14 +72,40 @@ def player1(host_arg, agent_arg, info_queue, action_queue, lock, event_obs, even
                 event_obs.set() # 存取觀察資料並傳遞後，通知主程序
                 
                 break
+            
+# 人類玩家模式     
+def spectator():
+    
+    config = os.path.join(vzd.scenarios_path, "maddpg_duel_coop.cfg")
+    game = vzd.DoomGame()
+    game.load_config(config)
+    game.add_game_args("-join 127.0.0.1")
+    game.add_game_args("+name Spectator +colorset 3")
+    game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
+    game.set_mode(vzd.Mode.ASYNC_SPECTATOR)
+    game.init()
+    
+    actions = [[1, 0, 0, 0, 0, 0, 0, 0]]
+    for episode in range(0, 10000):
+        while not game.is_episode_finished():
+            if game.is_player_dead():
+                game.respawn_player()
+            game.make_action(choice(actions))
+            
+        game.new_episode()
+    game.close()
                 
             
     
 # 主要訓練函式
 #256 64
-def train(update_size=256,batch_size=64,step_size=2000):
+def train(update_size=256,batch_size=64,step_size=2000,agent_num=2):
     
     env = gym.make(env_name, host=1) # host參數為1意指加入本地伺服器的客戶端
+    
+    # for spectator mode
+    if agent_num == 3:
+        agent_num = agent_num - 1
     
     # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
     obs_shape = []
@@ -184,9 +212,13 @@ def train(update_size=256,batch_size=64,step_size=2000):
             
             
 
-def play(step_size=2000):
+def play(step_size=2000, agent_num=2):
     
     env = gym.make(env_name, host=1) # host參數為1意指加入本地伺服器的客戶端
+    
+    # for spectator mode
+    if agent_num == 3:
+        agent_num = agent_num - 1
     
     # 觀察空間為的高為120、寬為160、頻道數為3(RGB)
     obs_shape = []
@@ -280,6 +312,8 @@ def play(step_size=2000):
 
 
 if __name__ == '__main__':
+    
+    # agent_num = 3 for spectator mode
     agent_num = 2
     host_arg = 0
     
@@ -295,8 +329,11 @@ if __name__ == '__main__':
     event_done = Event()
     step_size=2000
     
+    #spectator_proc = Process(target=spectator)
     player1_proc = Process(target=player1, args=(host_arg, agent_num, info_queue, action_queue, lock, event_obs, event_act, event_done,step_size))
     player1_proc.start()
-    train()
-    #play()
+    #spectator_proc.start()
+    train(256, 64, step_size, agent_num)
+    #play(step_size, agent_num)
     player1_proc.join()
+    #spectator_proc.join()
