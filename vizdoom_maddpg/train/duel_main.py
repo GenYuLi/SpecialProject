@@ -313,8 +313,14 @@ def play(step_size=2000, agent_num=2):
 
 if __name__ == '__main__':
     
-    # agent_num = 3 for spectator mode
-    agent_num = 2
+    spectator_mode = False
+    
+    if spectator_mode == True:
+        # agent_num = 3 for spectator mode
+        agent_num = 3
+    else:
+        agent_num = 2
+        
     host_arg = 0
     
     manager = Manager()
@@ -329,11 +335,14 @@ if __name__ == '__main__':
     event_done = Event()
     step_size=2000
     
-    #spectator_proc = Process(target=spectator)
+    if spectator_mode == True:
+        spectator_proc = Process(target=spectator)
     player1_proc = Process(target=player1, args=(host_arg, agent_num, info_queue, action_queue, lock, event_obs, event_act, event_done,step_size))
     player1_proc.start()
-    #spectator_proc.start()
+    if spectator_mode == True:
+        spectator_proc.start()
     train(256, 64, step_size, agent_num)
     #play(step_size, agent_num)
     player1_proc.join()
-    #spectator_proc.join()
+    if spectator_mode == True:
+        spectator_proc.join()
