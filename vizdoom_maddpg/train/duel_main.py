@@ -313,7 +313,9 @@ def play(step_size=2000, agent_num=2):
 
 if __name__ == '__main__':
     
+    # 設定觀察者模式與遊玩模式變數
     spectator_mode = False
+    play_mode = False
     
     if spectator_mode == True:
         # agent_num = 3 for spectator mode
@@ -341,8 +343,13 @@ if __name__ == '__main__':
     player1_proc.start()
     if spectator_mode == True:
         spectator_proc.start()
-    train(256, 64, step_size, agent_num)
-    #play(step_size, agent_num)
+        
+    # 執行遊玩模式或訓練模式    
+    if play_mode == True:
+        play(step_size, agent_num)
+    else:
+        train(256, 64, step_size, agent_num)
+        
     player1_proc.join()
     if spectator_mode == True:
         spectator_proc.join()
